@@ -111,10 +111,10 @@ export function getEnvBaseUrl() {
   // 请求基准地址
   let baseUrl = import.meta.env.VITE_SERVER_BASEURL
 
-  // # 有些同学可能需要在微信小程序里面根据 develop、trial、release 分别设置上传地址，参考代码如下。
-  const VITE_SERVER_BASEURL__WEIXIN_DEVELOP = 'https://huohua-server.daoyinshu.com'
-  const VITE_SERVER_BASEURL__WEIXIN_TRIAL = 'https://huohua-server.daoyinshu.com'
-  const VITE_SERVER_BASEURL__WEIXIN_RELEASE = 'https://huohua-server.daoyinshu.com'
+  // # 有些同学可能需要在微信小程序里面根据 develop、trial、release 分别设置请求地址，参考代码如下。
+  const VITE_SERVER_BASEURL__WEIXIN_DEVELOP = 'http://localhost:3001'
+  const VITE_SERVER_BASEURL__WEIXIN_TRIAL = 'http://localhost:3001'
+  const VITE_SERVER_BASEURL__WEIXIN_RELEASE = 'http://localhost:3001'
 
   // 微信小程序端环境区分
   if (isMpWeixin) {
@@ -145,9 +145,9 @@ export function getEnvBaseUploadUrl() {
   // 请求基准地址
   let baseUploadUrl = import.meta.env.VITE_UPLOAD_BASEURL
 
-  const VITE_UPLOAD_BASEURL__WEIXIN_DEVELOP = 'http://49.233.20.99:8072/upload'
-  const VITE_UPLOAD_BASEURL__WEIXIN_TRIAL = 'http://49.233.20.99:8072/upload'
-  const VITE_UPLOAD_BASEURL__WEIXIN_RELEASE = 'http://49.233.20.99:8072/upload'
+  const VITE_UPLOAD_BASEURL__WEIXIN_DEVELOP = 'http://localhost:3001/upload'
+  const VITE_UPLOAD_BASEURL__WEIXIN_TRIAL = 'http://localhost:3001/upload'
+  const VITE_UPLOAD_BASEURL__WEIXIN_RELEASE = 'http://localhost:3001/upload'
 
   // 微信小程序端环境区分
   if (isMpWeixin) {

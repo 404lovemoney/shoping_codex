@@ -30,6 +30,18 @@ const formData = reactive({
 const phoneFocused = ref(false)
 const passwordFocused = ref(false)
 const isLoading = ref(false)
+const redirectUrl = ref('')
+
+onLoad((options) => {
+  if (typeof options?.redirect === 'string') {
+    try {
+      redirectUrl.value = decodeURIComponent(options.redirect)
+    }
+    catch {
+      redirectUrl.value = options.redirect
+    }
+  }
+})
 
 // 请先阅读并勾选协议
 const isAgreePrivacy = ref(false)
@@ -204,6 +216,10 @@ const fetchUserAddressHandle = async () => {
 
 // 登录成功后续操作
 const loginSuccess = (response) => {
+  if (!response?.token) {
+    return
+  }
+
   // 保存登录状态
   userStore.setUserToken(response)
 
@@ -218,16 +234,17 @@ const loginSuccess = (response) => {
   })
 
   // 登录成功处理相应跳转
-  let pageUrl = uni.getStorageSync('pageUrl')
+  let pageUrl = redirectUrl.value || uni.getStorageSync('pageUrl')
   if (pageUrl) {
     // 如果为tabbar页面则用reLaunch跳转
-    if (['/pages/home/home'].includes(pageUrl)) {
+    if (['/pages/home/home', '/pages/box/index/index', '/pages/points/index/index', '/pages/usercenter/index'].includes(pageUrl.split('?')[0])) {
       uni.reLaunch({url: pageUrl})
     } else {
       uni.redirectTo({url: pageUrl})
     }
     //跳转后，删除url记录避免重复跳转
     uni.removeStorageSync('pageUrl')
+    redirectUrl.value = ''
   } else {
     // 如果没有默认跳转到首页
     // 跳转到用户中心

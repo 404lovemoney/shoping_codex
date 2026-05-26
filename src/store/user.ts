@@ -56,9 +56,16 @@ export const useUserStore = defineStore(
     // 定义地址信息
     const userAddress = ref<IUserAddress>({ ...userAddressState })
 
+    const getToken = () => {
+      return uni.getStorageSync('token') || userInfo.value.token || ''
+    }
+
     // 设置用户token
     const setUserToken = (val: IUserLogin) => {
       console.log('设置token', val)
+      if (!val?.token) {
+        return
+      }
       uni.setStorageSync('token', val.token)
       userInfo.value.token = val.token
     }
@@ -80,7 +87,15 @@ export const useUserStore = defineStore(
       else {
         val.avatar = 'https://img.niantu.cn/spark-mall/static/images/default-avatar.png'
       }
-      userInfo.value = val
+      const token = val.token || getToken()
+      userInfo.value = {
+        ...val,
+        token,
+      }
+      if (token) {
+        uni.setStorageSync('token', token)
+      }
+      uni.setStorageSync('userInfo', userInfo.value)
       // userInfo.value.points = val.points
       // userInfo.value.balance = val.balance
     }
@@ -124,6 +139,7 @@ export const useUserStore = defineStore(
       userInfo.value = { ...userInfoState }
       userAddress.value = { ...userAddressState }
       uni.removeStorageSync('token')
+      uni.removeStorageSync('userInfo')
       uni.removeStorageSync('openId')
     }
 
@@ -180,7 +196,7 @@ export const useUserStore = defineStore(
       const res = await _login(LoginParams)
       console.log('登录信息', res)
       toast.success('登录成功')
-      uni.setStorageSync('token', res.token)
+      setUserToken(res)
       await getUserInfo() // 获取用户信息
       return res
     }
@@ -240,7 +256,7 @@ export const useUserStore = defineStore(
         const res = await _getWechatPhoneLogin(LoginParams)
         console.log('登录信息', res)
         toast.success('登录成功')
-        uni.setStorageSync('token', res.token)
+        setUserToken(res)
         await getUserInfo() // 获取用户信息
         return res
       } catch (error) {
@@ -253,7 +269,7 @@ export const useUserStore = defineStore(
      * 是否已登录
      */   
     const isLoggedIn = ()=> {
-      return userInfo.value.token !== ''
+      return !!getToken()
     }
 
      /**
@@ -268,6 +284,7 @@ export const useUserStore = defineStore(
       userAddress,
       login,
       register,
+      getToken,
       isLoggedIn,
       isFirstAddress,
       wxOpenId,
