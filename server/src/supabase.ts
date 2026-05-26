@@ -9,21 +9,42 @@ config({ path: resolve(serverRoot, '.env') })
 
 function assertSupabaseConfig() {
   const supabaseUrl = process.env.SUPABASE_URL
-  const supabaseKey = process.env.SUPABASE_KEY
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
   if (!supabaseUrl || !supabaseKey) {
-    throw new Error('Missing SUPABASE_URL or SUPABASE_KEY in server/.env')
+    throw new Error(
+      'Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in server/.env'
+    )
   }
 
   if (!URL.canParse(supabaseUrl)) {
-    throw new Error('Invalid SUPABASE_URL in server/.env. Example: https://xxxx.supabase.co')
+    throw new Error(
+      'Invalid SUPABASE_URL in server/.env. Example: https://xxxx.supabase.co'
+    )
   }
 
-  if (supabaseKey.includes('your-supabase')) {
-    throw new Error('Invalid SUPABASE_KEY in server/.env. Replace the placeholder with your Supabase anon or service role key.')
+  if (
+    supabaseUrl.includes('your-project-ref')
+    || supabaseUrl.includes('placeholder')
+    || supabaseKey.includes('your-')
+    || supabaseKey.includes('placeholder')
+  ) {
+    throw new Error(
+      'Invalid Supabase config in server/.env'
+    )
   }
 
   return { supabaseUrl, supabaseKey }
+}
+
+export function hasSupabaseConfig() {
+  try {
+    assertSupabaseConfig()
+    return true
+  }
+  catch {
+    return false
+  }
 }
 
 export function getSupabase() {

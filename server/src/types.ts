@@ -9,16 +9,36 @@ export type ProductRow = {
   id: number
   cate_id?: number | null
   product_name?: string | null
+  name?: string | null
+  description?: string | null
   product_grade?: string | null
   premium?: string | number | null
   exchange_price?: string | number | null
   dismantle_price?: string | number | null
   shipping_fee?: string | number | null
   store_page_icon?: string | null
+  img_src?: string | null
   product_detail_ad_image?: string | null
   product_detail_images?: string[] | string | null
+  bg_type?: number | null
+  icon_type?: number | null
+  first_price?: string | number | null
+  discount_price?: string | number | null
+  price?: string | number | null
+  prize_price_limit?: string | null
+  type?: number | null
+  detail_img?: string | null
   show_store?: number | null
+  is_recommend?: boolean | number | null
+  is_hot?: boolean | number | null
   created_at?: string | null
+}
+
+export type ProductCategoryRow = {
+  id: number
+  cate_name?: string | null
+  icon?: string | null
+  sort?: number | null
 }
 
 export type OrderRow = {
@@ -45,21 +65,5 @@ export type BannerRow = {
   type?: number | null
   box_id?: number | null
   img_src?: string | null
-  detail_img?: string | null
-}
-
-export type ProductBoxRow = {
-  id: number
-  box_id?: number | null
-  name?: string | null
-  description?: string | null
-  img_src?: string | null
-  bg_type?: number | null
-  icon_type?: number | null
-  first_price?: string | number | null
-  discount_price?: string | number | null
-  price?: string | number | null
-  prize_price_limit?: string | null
-  type?: number | null
   detail_img?: string | null
 }

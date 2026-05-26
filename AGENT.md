@@ -323,3 +323,10 @@ Remove-Item "C:\path\to\file.txt"
 ```
 
 如果需要批量删除文件，应停止操作，并请求用户手动删除。
+
+
+Preferred shell: PowerShell
+
+Use Windows PowerShell commands.
+Package manager: pnpm
+Node managed by nvm.
