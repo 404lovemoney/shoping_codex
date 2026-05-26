@@ -3,7 +3,7 @@ import cors from 'cors'
 import { getSupabase, hasSupabaseConfig } from './supabase.js'
 import { failure, success } from './response.js'
 import { mapBanner, mapHomeBox, mapOrder, mapProduct, mapProductCategory } from './mappers.js'
-import { getMockProductRows, mockCategories, mockHome, mockOrders, mockUser } from './mock-data.js'
+import { getMockProductRows, mockAddress, mockCategories, mockHome, mockMessages, mockOrders, mockUser } from './mock-data.js'
 import type { BannerRow, OrderRow, ProductCategoryRow, ProductRow } from './types.js'
 
 const app = express()
@@ -23,6 +23,78 @@ const getPagination = (total: number, page: number, pageSize: number) => ({
 })
 
 const useMockData = () => !hasSupabaseConfig()
+
+const createOrderNo = (prefix = 'SM') => `${prefix}${Date.now()}${Math.floor(Math.random() * 1000)}`
+
+function paginate<T>(list: T[], page: number, pageSize: number) {
+  const from = (page - 1) * pageSize
+  const to = from + pageSize
+
+  return {
+    list: list.slice(from, to),
+    pagination: getPagination(list.length, page, pageSize),
+  }
+}
+
+function getMockOrder(orderNo: unknown) {
+  return mockOrders.find(item => item.order_no === String(orderNo)) ?? mockOrders[0]
+}
+
+async function getSupabaseProduct(productId: number) {
+  const supabase = getSupabase()
+  const { data, error } = await supabase
+    .from('products')
+    .select('*')
+    .eq('id', productId)
+    .maybeSingle()
+
+  if (error) {
+    throw error
+  }
+
+  return data as ProductRow | null
+}
+
+async function createSupabaseOrder(params: {
+  productId?: number
+  orderType: number
+  orderNoPrefix: string
+  totalPrice?: unknown
+  shippingFee?: unknown
+  points?: unknown
+  count?: unknown
+  content: string
+}) {
+  const supabase = getSupabase()
+  const product = params.productId ? await getSupabaseProduct(params.productId) : null
+  const mappedProduct = product ? mapProduct(product) : null
+  const orderNo = createOrderNo(params.orderNoPrefix)
+  const count = Number(params.count || 1)
+
+  const { error } = await supabase
+    .from('orders')
+    .insert({
+      order_no: orderNo,
+      order_type: params.orderType,
+      status: 0,
+      total_price: Number(params.totalPrice || product?.premium || 0),
+      shipping_fee: Number(params.shippingFee || product?.shipping_fee || 0),
+      total_points: Number(params.points || 0),
+      exchange_total_points: Number(params.points || 0),
+      product_count: count,
+      product_list: mappedProduct ? [{ ...mappedProduct, count }] : [],
+      exchange_list: [],
+      address: mockAddress,
+      content: params.content,
+      detail_img: product?.product_detail_ad_image ?? product?.detail_img ?? null,
+    })
+
+  if (error) {
+    throw error
+  }
+
+  return orderNo
+}
 
 app.get('/health', (_req, res) => {
   success(res, { status: 'ok', port })
@@ -135,6 +207,76 @@ app.get('/user/info', async (req, res) => {
     console.error(error)
     failure(res)
   }
+})
+
+app.post('/user/register', async (req, res) => {
+  try {
+    const phone = String(req.body?.phone || TEST_PHONE)
+
+    success(res, {
+      token: TEST_TOKEN,
+      userInfo: {
+        ...mockUser,
+        phone,
+        token: TEST_TOKEN,
+      },
+    })
+  }
+  catch (error) {
+    console.error(error)
+    failure(res)
+  }
+})
+
+app.get('/user/address/list', async (_req, res) => {
+  success(res, [mockAddress])
+})
+
+app.get('/user/address/create', async (req, res) => {
+  success(res, {
+    id: Date.now(),
+    ...req.query,
+  })
+})
+
+app.get('/user/address/update', async (req, res) => {
+  success(res, req.query)
+})
+
+app.get('/user/address/delete', async (req, res) => {
+  success(res, { id: req.query.id })
+})
+
+app.get('/user/address/setDefault', async (req, res) => {
+  success(res, { id: req.query.id, isDefault: 1 })
+})
+
+app.get('/user/pointsChangeList', async (req, res) => {
+  const page = Number(req.query.page || 1)
+  const pageSize = Number(req.query.pageSize || 10)
+  const records = Array.from({ length: 18 }, (_, index) => ({
+    id: index + 1,
+    title: index % 2 === 0 ? '下单消耗' : '活动赠送',
+    points: index % 2 === 0 ? -120 : 200,
+    created_at: '2026-05-23 12:00:00',
+  }))
+  const { list, pagination } = paginate(records, page, pageSize)
+
+  success(res, { recordList: list, pagination })
+})
+
+app.get('/user/balanceChangeList', async (req, res) => {
+  const page = Number(req.query.page || 1)
+  const pageSize = Number(req.query.pageSize || 10)
+  const records = Array.from({ length: 12 }, (_, index) => ({
+    id: index + 1,
+    title: index % 2 === 0 ? '余额支付' : '售卖收入',
+    amount: index % 2 === 0 ? '-12.00' : '+28.00',
+    created_at: '2026-05-23 12:00:00',
+  }))
+  const { list, pagination } = paginate(records, page, pageSize)
+
+  success(res, { recordList: list, pagination })
 })
 
 app.get('/index/index', async (_req, res) => {
@@ -313,6 +455,62 @@ app.get('/product/productInfo', async (req, res) => {
   }
 })
 
+app.get('/product/createOrder', async (req, res) => {
+  try {
+    if (useMockData()) {
+      return success(res, {
+        orderNo: createOrderNo('MOCK'),
+        params: req.query,
+      })
+    }
+
+    const orderNo = await createSupabaseOrder({
+      productId: Number(req.query.id),
+      orderType: 2,
+      orderNoPrefix: 'SP',
+      totalPrice: req.query.totalPrice,
+      shippingFee: req.query.shippingFee,
+      points: req.query.points,
+      count: req.query.count,
+      content: '商品下单',
+    })
+
+    success(res, { orderNo })
+  }
+  catch (error) {
+    console.error(error)
+    failure(res)
+  }
+})
+
+app.get('/product/exchangeProduct', async (req, res) => {
+  try {
+    if (useMockData()) {
+      return success(res, {
+        orderNo: createOrderNo('MOCKEX'),
+        params: req.query,
+      })
+    }
+
+    const orderNo = await createSupabaseOrder({
+      productId: Number(req.query.id),
+      orderType: 3,
+      orderNoPrefix: 'EX',
+      totalPrice: req.query.balance,
+      shippingFee: req.query.shippingFee,
+      points: req.query.points,
+      count: req.query.count,
+      content: '积分兑换商品',
+    })
+
+    success(res, { orderNo })
+  }
+  catch (error) {
+    console.error(error)
+    failure(res)
+  }
+})
+
 app.get('/order/orderList', async (req, res) => {
   try {
     const page = Number(req.query.page || 1)
@@ -356,6 +554,188 @@ app.get('/order/orderList', async (req, res) => {
     success(res, {
       orderList: ((data ?? []) as OrderRow[]).map(mapOrder),
       pagination: getPagination(count ?? 0, page, pageSize),
+    })
+  }
+  catch (error) {
+    console.error(error)
+    failure(res)
+  }
+})
+
+app.get('/order/orderDetail', async (req, res) => {
+  try {
+    if (useMockData()) {
+      return success(res, mapOrder(getMockOrder(req.query.orderNo)))
+    }
+
+    const supabase = getSupabase()
+    const { data, error } = await supabase
+      .from('orders')
+      .select('*')
+      .eq('order_no', String(req.query.orderNo))
+      .maybeSingle()
+
+    if (error) {
+      throw error
+    }
+
+    success(res, data ? mapOrder(data as OrderRow) : null)
+  }
+  catch (error) {
+    console.error(error)
+    failure(res)
+  }
+})
+
+app.get('/order/confirmReceipt', async (req, res) => {
+  try {
+    const orderNo = String(req.query.orderNo)
+
+    if (!useMockData()) {
+      const { error } = await getSupabase()
+        .from('orders')
+        .update({ status: 3 })
+        .eq('order_no', orderNo)
+
+      if (error) {
+        throw error
+      }
+    }
+
+    success(res, { orderNo })
+  }
+  catch (error) {
+    console.error(error)
+    failure(res)
+  }
+})
+
+app.get('/order/pay', async (req, res) => {
+  try {
+    const orderNo = String(req.query.orderNo)
+
+    if (!useMockData()) {
+      const { error } = await getSupabase()
+        .from('orders')
+        .update({ status: 1 })
+        .eq('order_no', orderNo)
+
+      if (error) {
+        throw error
+      }
+    }
+
+    success(res, { orderNo, paid: true })
+  }
+  catch (error) {
+    console.error(error)
+    failure(res)
+  }
+})
+
+app.get('/order/wechatMiniAppPay', async (req, res) => {
+  try {
+    const orderNo = String(req.query.orderNo)
+
+    if (!useMockData()) {
+      const { error } = await getSupabase()
+        .from('orders')
+        .update({ status: 1 })
+        .eq('order_no', orderNo)
+
+      if (error) {
+        throw error
+      }
+    }
+
+    success(res, { orderNo, paid: true })
+  }
+  catch (error) {
+    console.error(error)
+    failure(res)
+  }
+})
+
+app.get('/order/collectProducts', async (req, res) => {
+  try {
+    if (useMockData()) {
+      return success(res, {
+        orderNo: createOrderNo('MOCKCOL'),
+        params: req.query,
+      })
+    }
+
+    const firstProductId = String(req.query.id || '')
+      .split(',')
+      .map(item => Number(item))
+      .find(Boolean)
+
+    const orderNo = await createSupabaseOrder({
+      productId: firstProductId,
+      orderType: 4,
+      orderNoPrefix: 'CO',
+      totalPrice: req.query.balance,
+      shippingFee: req.query.shippingFee,
+      count: 1,
+      content: '盒柜商品提货',
+    })
+
+    success(res, { orderNo })
+  }
+  catch (error) {
+    console.error(error)
+    failure(res)
+  }
+})
+
+app.get('/message/list', async (req, res) => {
+  const page = Number(req.query.page || 1)
+  const pageSize = Number(req.query.pageSize || 10)
+  const { list, pagination } = paginate(mockMessages, page, pageSize)
+
+  success(res, {
+    messageList: list,
+    list,
+    pagination,
+  })
+})
+
+app.get('/message/detail', async (req, res) => {
+  const message = mockMessages.find(item => item.id === Number(req.query.id)) ?? mockMessages[0]
+
+  success(res, message)
+})
+
+app.get('/index/publicDetail', async (req, res) => {
+  try {
+    if (!useMockData()) {
+      const { data, error } = await getSupabase()
+        .from('banners')
+        .select('id, detail_img')
+        .eq('id', Number(req.query.id))
+        .maybeSingle()
+
+      if (error) {
+        throw error
+      }
+
+      if (data) {
+        return success(res, {
+          id: data.id,
+          title: '公告详情',
+          detailImg: data.detail_img,
+          content: '',
+        })
+      }
+    }
+
+    const banner = mockHome.topList.find(item => item.id === Number(req.query.id)) ?? mockHome.topList[0]
+
+    success(res, {
+      id: Number(req.query.id || banner.id),
+      title: '公告详情',
+      detailImg: banner.detailImg,
+      content: '本地 mock 公告内容',
     })
   }
   catch (error) {

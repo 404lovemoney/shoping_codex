@@ -104,7 +104,7 @@ export const mockHome = {
   hotList: [mockBoxes[1]],
 }
 
-const mockAddress = {
+export const mockAddress = {
   id: 1,
   userId: 10001,
   contactName: '火花用户',
@@ -152,6 +152,16 @@ export const mockOrders: OrderRow[] = [
     address: mockAddress,
     content: '积分兑换 mock 订单',
     detail_img: image('order-detail-2', 750, 420),
+  },
+]
+
+export const mockMessages = [
+  {
+    id: 1,
+    title: '本地 mock 通知',
+    created_at: '2026-05-23 12:00:00',
+    content: '欢迎使用本地 mock 服务。',
+    detailImg: image('message-detail', 750, 900),
   },
 ]
 
