@@ -14,7 +14,6 @@ defineOptions({
 
 import { isArray } from 'wot-design-uni/components/common/util'
 import { FormRules } from 'wot-design-uni/components/wd-form/types'
-import { useToast, useMessage } from 'wot-design-uni'
 import { reactive, ref } from 'vue'
 
 import { addUserAddress } from '@/api/address';
@@ -32,7 +31,7 @@ const { colPickerData, findChildrenByCode } = useColPickerData()
 onLoad((options) => {
   console.log('options', options);
   // 设置来源页
-  originPage.value = options.originPage
+  originPage.value = options.originPage || ''
 })
 
 const model = reactive<{
@@ -136,13 +135,14 @@ const ColPickerColumnChange = ({ selectedItem, resolve, finish }) => {
   }
 }
 
-const toast = useToast()
 const form = ref()
+const submitting = ref(false)
 
 // 来源
 const originPage = ref<string>('')
 
 function handleSubmit() {
+  if (submitting.value) return
   form.value
     .validate()
     .then(({ valid, errors }) => {
@@ -162,44 +162,59 @@ function handleSubmit() {
 
 // 调用创建地址接口
 const addUserAddressApi = async ()=> {
-  const res = await addUserAddress({
-    contactName: model.contactName,
-    contactPhone: model.contactPhone,
-    province: model.province,
-    city: model.city,
-    district: model.district,
-    areaValues: model.areaValues,
-    detailAddress: model.detailAddress,
-    isDefault: model.switchVal ? 1: 0
-  })
+  submitting.value = true
+  try {
+    await addUserAddress({
+      contactName: model.contactName.trim(),
+      contactPhone: model.contactPhone.trim(),
+      province: model.province,
+      city: model.city,
+      district: model.district,
+      areaValues: model.areaValues,
+      detailAddress: model.detailAddress.trim(),
+      isDefault: model.switchVal ? 1: 0
+    })
 
-  uni.showToast({
-    title: '添加成功'
-  })
+    uni.showToast({
+      title: '添加成功'
+    })
 
-  // 更新一下地址信息，便于订单页面获取
-  await fetchUserAddressHandle()
+    // 更新一下地址信息，便于订单页面获取
+    await fetchUserAddressHandle()
 
-  // 从非地址列表页来的
-  if (originPage.value) {
-    // todo
-    let pageUrl = uni.getStorageSync('pageUrl')
-    if (pageUrl) {
-      // 如果为tabbar页面则用reLaunch跳转
-      if (['/pages/home/home'].includes(pageUrl)) {
-        uni.reLaunch({url: pageUrl})
-      } else {
-        uni.redirectTo({url: pageUrl})
-      }
-      //跳转后，删除url记录避免重复跳转
-      uni.removeStorageSync('pageUrl')
-    }
-  } else {
-    // 返回地址列表页
-    uni.navigateTo({
-      url: `/pages-user/address/list`,
+    backAfterSave()
+  }
+  catch (error: any) {
+    uni.showToast({
+      title: error.message || '添加失败，请重试',
+      icon: 'none'
     })
   }
+  finally {
+    submitting.value = false
+  }
+}
+
+const backAfterSave = () => {
+  if (originPage.value) {
+    const pageUrl = uni.getStorageSync('pageUrl')
+    if (pageUrl) {
+      if (['/pages/home/home', '/pages/box/index/index', '/pages/points/index/index', '/pages/usercenter/index'].includes(pageUrl.split('?')[0])) {
+        uni.reLaunch({ url: pageUrl })
+      }
+      else {
+        uni.redirectTo({ url: pageUrl })
+      }
+      uni.removeStorageSync('pageUrl')
+      return
+    }
+    uni.navigateBack()
+    return
+  }
+
+  uni.redirectTo({
+    url: '/pages-user/address/list',
+  })
 }
 
 // 获取用户地址
@@ -210,7 +225,7 @@ const fetchUserAddressHandle = async () => {
     console.log('response', response)
   } catch (error: any) {
     uni.showToast({
-      title: error.message || '登录失败，请重试',
+      title: error.message || '地址加载失败，请重试',
       icon: 'none',
       duration: 2000
     })
@@ -221,14 +236,12 @@ const fetchUserAddressHandle = async () => {
 
 function handleConfirm({ value, selectedItems }) {
   console.log(value, selectedItems)
-  model.province = selectedItems[0].label
-  model.city = selectedItems[1].label
-  model.district = selectedItems[2].label
+  model.province = selectedItems[0]?.label || ''
+  model.city = selectedItems[1]?.label || ''
+  model.district = selectedItems[2]?.label || ''
   model.areaValues = value.join()
   console.log('areaValues', model.areaValues)
 }
-
-const value = ref<string[]>([])
 
 // { value(选项值数组), selectedItems(选项数组) }
 // function handleConfirm({ value, selectedItems }) {
@@ -297,7 +310,7 @@ const value = ref<string[]>([])
         </wd-cell>
       </wd-cell-group>
       <view class="footer">
-        <wd-button type="primary" size="large" @click="handleSubmit" block>提交</wd-button>
+        <wd-button type="primary" size="large" :loading="submitting" @click="handleSubmit" block>提交</wd-button>
       </view>
     </wd-form>
 

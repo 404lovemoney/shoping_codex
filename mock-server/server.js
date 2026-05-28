@@ -215,6 +215,76 @@ app.get('/user/address/list', (_req, res) => {
   res.json(success(addressList))
 })
 
+app.get('/user/address/create', (req, res) => {
+  const address = {
+    id: Date.now(),
+    userId: userInfo.id,
+    contactName: String(req.query.contactName || ''),
+    contactPhone: String(req.query.contactPhone || ''),
+    province: String(req.query.province || ''),
+    city: String(req.query.city || ''),
+    district: String(req.query.district || ''),
+    detailAddress: String(req.query.detailAddress || ''),
+    areaValues: String(req.query.areaValues || ''),
+    isDefault: Number(req.query.isDefault || 0),
+  }
+
+  if (address.isDefault === 1) {
+    addressList.forEach(item => {
+      item.isDefault = 0
+    })
+  }
+
+  addressList.unshift(address)
+  res.json(success(address))
+})
+
+app.get('/user/address/update', (req, res) => {
+  const id = Number(req.query.id || 0)
+  const index = addressList.findIndex(item => item.id === id)
+  if (index < 0) {
+    return res.json(success(null))
+  }
+
+  const nextAddress = {
+    ...addressList[index],
+    contactName: String(req.query.contactName || addressList[index].contactName || ''),
+    contactPhone: String(req.query.contactPhone || addressList[index].contactPhone || ''),
+    province: String(req.query.province || addressList[index].province || ''),
+    city: String(req.query.city || addressList[index].city || ''),
+    district: String(req.query.district || addressList[index].district || ''),
+    detailAddress: String(req.query.detailAddress || addressList[index].detailAddress || ''),
+    areaValues: String(req.query.areaValues || addressList[index].areaValues || ''),
+    isDefault: Number(req.query.isDefault ?? addressList[index].isDefault ?? 0),
+  }
+
+  if (nextAddress.isDefault === 1) {
+    addressList.forEach(item => {
+      item.isDefault = 0
+    })
+  }
+
+  addressList[index] = nextAddress
+  res.json(success(nextAddress))
+})
+
+app.get('/user/address/delete', (req, res) => {
+  const id = Number(req.query.id || 0)
+  const index = addressList.findIndex(item => item.id === id)
+  if (index >= 0) {
+    addressList.splice(index, 1)
+  }
+  res.json(success({ id }))
+})
+
+app.get('/user/address/setDefault', (req, res) => {
+  const id = Number(req.query.id || 0)
+  addressList.forEach(item => {
+    item.isDefault = item.id === id ? 1 : 0
+  })
+  res.json(success({ id, isDefault: 1 }))
+})
+
 app.get('/user/pointsChangeList', (req, res) => {
   const records = Array.from({ length: 18 }, (_, index) => ({
     id: index + 1,

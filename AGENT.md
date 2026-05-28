@@ -2,7 +2,7 @@
 
 ## 项目概览
 
-本项目是一个基于 `uni-app` / Vue 3 / TypeScript 的跨端盲盒商城应用。环境配置中展示的产品名是 `火花盲盒`。
+本项目是一个基于 `uni-app` / Vue 3 / TypeScript 的跨端盲盒商城应用。环境配置中展示的产品名是 `盲盒商城系统`。
 
 主要目标平台：
 
@@ -133,7 +133,7 @@ Tabbar 配置：
 `env/.env` 中的重要配置：
 
 ```text
-VITE_APP_TITLE = '火花盲盒'
+VITE_APP_TITLE = '盲盒商城系统'
 VITE_APP_PORT = 9000
 VITE_SERVER_BASEURL = 'https://huohua-server.daoyinshu.com'
 VITE_UPLOAD_BASEURL = 'https://huohua-server.daoyinshu.com/upload'

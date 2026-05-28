@@ -14,10 +14,13 @@ defineOptions({
 
 import { isArray } from 'wot-design-uni/components/common/util'
 import { FormRules } from 'wot-design-uni/components/wd-form/types'
-import { useToast, useMessage } from 'wot-design-uni'
 import { reactive, ref } from 'vue'
 
 import { updateUserAddress } from '@/api/address';
+
+// pinia
+import { useUserStore } from '@/store'
+const userStore = useUserStore()
 
 // useColPickerData可以参考本章节顶部的介绍
 // 导入路径根据自己实际情况调整，万不可一贴了之
@@ -26,8 +29,9 @@ const { colPickerData, findChildrenByCode } = useColPickerData()
 
 
 onLoad(async (option) => {
+  originPage.value = option.originPage || ''
   // 获取路由参数
-  const data = JSON.parse(decodeURIComponent(option.data));
+  const data = option.data ? JSON.parse(decodeURIComponent(option.data)) : {};
   console.log('options data', data);
   if (data.id) {
     model.id = data.id
@@ -39,9 +43,8 @@ onLoad(async (option) => {
     model.district = data.district
     model.detailAddress = data.detailAddress
     model.switchVal = data.isDefault === 1 ? true : false
-    model.areaValues = data.areaValues
-
-    model.address = data.areaValues.split(',')
+    model.areaValues = data.areaValues || ''
+    model.address = data.areaValues ? data.areaValues.split(',') : []
     
     console.log('address', model.address, model.address.length);
 
@@ -52,32 +55,13 @@ onLoad(async (option) => {
 
 onMounted(async () => {
   console.log('address', model.address);
-  area.value = [
-    colPickerData.map((item) => {
-      return {
-        value: item.value,
-        label: item.text
-      }
-    }),
-    findChildrenByCode(colPickerData, model['address'][0])!.map((item) => {
-      return {
-        value: item.value,
-        label: item.text
-      }
-    }),
-    findChildrenByCode(colPickerData, model['address'][1])!.map((item) => {
-      return {
-        value: item.value,
-        label: item.text
-      }
-    })
-  ]
+  initAreaColumns()
 })
 
 
 const model = reactive<{
-  id: number,
-  userId: number,
+  id: number | null,
+  userId: number | null,
   contactName: string
   contactPhone: string
   province: string,
@@ -163,7 +147,50 @@ const init = () => {
 
 }
 
-const area = ref<any[]>([])
+const originPage = ref<string>('')
+const submitting = ref(false)
+
+const area = ref<any[]>([
+  colPickerData.map((item) => {
+    return {
+      value: item.value,
+      label: item.text
+    }
+  })
+])
+
+const initAreaColumns = () => {
+  const columns: any[] = [
+    colPickerData.map((item) => {
+      return {
+        value: item.value,
+        label: item.text
+      }
+    })
+  ]
+
+  const provinceChildren = model.address[0] ? findChildrenByCode(colPickerData, model.address[0]) : []
+  if (provinceChildren?.length) {
+    columns.push(provinceChildren.map((item) => {
+      return {
+        value: item.value,
+        label: item.text
+      }
+    }))
+  }
+
+  const cityChildren = model.address[1] ? findChildrenByCode(colPickerData, model.address[1]) : []
+  if (cityChildren?.length) {
+    columns.push(cityChildren.map((item) => {
+      return {
+        value: item.value,
+        label: item.text
+      }
+    }))
+  }
+
+  area.value = columns
+}
 
 const ColPickerColumnChange = ({ selectedItem, resolve, finish }) => {
   const areaData = findChildrenByCode(colPickerData, selectedItem.value)
@@ -185,6 +212,7 @@ const form = ref()
 
 
 function handleSubmit() {
+  if (submitting.value) return
   form.value
     .validate()
     .then(({ valid, errors }) => {
@@ -204,35 +232,68 @@ function handleSubmit() {
 
 // 调用创建地址接口
 const updateUserAddressApi = async ()=> {
-  const res = await updateUserAddress({
-    id: model.id,
-    userId: model.userId,
-    contactName: model.contactName,
-    contactPhone: model.contactPhone,
-    province: model.province,
-    city: model.city,
-    district: model.district,
-    detailAddress: model.detailAddress,
-    isDefault: model.switchVal ? 1: 0,
-    areaValues: model.areaValues
-  })
+  if (!model.id) return
+  submitting.value = true
+  try {
+    await updateUserAddress({
+      id: model.id,
+      userId: model.userId || 0,
+      contactName: model.contactName.trim(),
+      contactPhone: model.contactPhone.trim(),
+      province: model.province,
+      city: model.city,
+      district: model.district,
+      detailAddress: model.detailAddress.trim(),
+      isDefault: model.switchVal ? 1: 0,
+      areaValues: model.areaValues
+    })
 
-  uni.showToast({
-    title: '修改成功'
-  })
+    uni.showToast({
+      title: '修改成功'
+    })
 
-  // 返回地址列表页
-  uni.navigateTo({
-    url: `/pages-user/address/list`,
+    await userStore.getUserAddressList()
+    backAfterSave()
+  }
+  catch (error: any) {
+    uni.showToast({
+      title: error.message || '修改失败，请重试',
+      icon: 'none'
+    })
+  }
+  finally {
+    submitting.value = false
+  }
+}
+
+const backAfterSave = () => {
+  if (originPage.value) {
+    const pageUrl = uni.getStorageSync('pageUrl')
+    if (pageUrl) {
+      if (['/pages/home/home', '/pages/box/index/index', '/pages/points/index/index', '/pages/usercenter/index'].includes(pageUrl.split('?')[0])) {
+        uni.reLaunch({ url: pageUrl })
+      }
+      else {
+        uni.redirectTo({ url: pageUrl })
+      }
+      uni.removeStorageSync('pageUrl')
+      return
+    }
+    uni.navigateBack()
+    return
+  }
+
+  uni.redirectTo({
+    url: '/pages-user/address/list',
   })
 }
 
 // 填充省市区的名字
 function handleConfirm({ value, selectedItems }) {
   console.log(value, selectedItems)
-  model.province = selectedItems[0].label
-  model.city = selectedItems[1].label
-  model.district = selectedItems[2].label
+  model.province = selectedItems[0]?.label || ''
+  model.city = selectedItems[1]?.label || ''
+  model.district = selectedItems[2]?.label || ''
   console.log('province', model.province);
   console.log('city', model.city);
   console.log('district', model.district);
@@ -270,7 +331,6 @@ function handleConfirm({ value, selectedItems }) {
       </wd-cell-group>
       <wd-cell-group custom-class="group" border>
         <wd-col-picker
-          v-if="area.length === 3"
           label="所在地区"
           placeholder="点击选择地址"
           label-width="100px"
@@ -297,7 +357,7 @@ function handleConfirm({ value, selectedItems }) {
         </wd-cell>
       </wd-cell-group>
       <view class="footer">
-        <wd-button type="primary" size="large" @click="handleSubmit" block>保存地址</wd-button>
+        <wd-button type="primary" size="large" :loading="submitting" @click="handleSubmit" block>保存地址</wd-button>
       </view>
     </wd-form>
 

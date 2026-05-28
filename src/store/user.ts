@@ -191,19 +191,23 @@ export const useUserStore = defineStore(
      */
     const getUserAddressList = async () => {
       const res = await _getUserAddressList()
-      if (res.length) {
-        let isDefaultAddress = res.some(item => item.isDefault === 1)
+      const addressList = Array.isArray(res) ? res : []
+      if (addressList.length) {
+        let isDefaultAddress = addressList.some(item => item.isDefault === 1)
         let defaultAddress
         if (isDefaultAddress) {
-          defaultAddress = res.filter(item => item.isDefault === 1)[0]
+          defaultAddress = addressList.filter(item => item.isDefault === 1)[0]
         } else {
-          defaultAddress = res[0]
+          defaultAddress = addressList[0]
         }
         console.log('defaultAddress', defaultAddress)
         setUserAddress(defaultAddress)
       }
-      console.log('pinia getUserAddressList', res)
-      return res
+      else {
+        removeUserAddress()
+      }
+      console.log('pinia getUserAddressList', addressList)
+      return addressList
     }
 
     /**
