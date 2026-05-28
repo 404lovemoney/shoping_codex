@@ -216,7 +216,7 @@ export const useUserStore = defineStore(
      * @returns R<LoginResponse>
      */
     const login = async (LoginParams: {
-      phone: number
+      phone: number | string
       password: string
       code?: number | null
       type: number

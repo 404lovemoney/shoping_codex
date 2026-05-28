@@ -4,7 +4,7 @@ import type { addressItem } from '@/api/types/address'
 import type { IUserInfo } from '@/api/types/login'
 // 认证相关接口类型
 export interface LoginParams {
-  phone: number  // 手机号
+  phone: number | string  // 手机号/演示账号
   password: string // 密码
   code?: number // 验证码
   type: number // 登录类型 1 验证码 2 密码

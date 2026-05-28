@@ -218,7 +218,7 @@ const handleLogin = async () => {
 
     // 使用 pinia 调用登录
     const response = await userStore.login({
-      phone: Number(phone),
+      phone,
       password,
       code: null,
       type: 2

@@ -1,6 +1,7 @@
 insert into users (id, phone, username, avatar, balance, points, sex, is_agent, open_id, token)
 values
-  (10001, '13800000000', '火花用户', 'https://img.niantu.cn/spark-mall/static/images/default-avatar.png', 268.80, 3600, '未知', 1, 'mock-open-id', 'mock-token-001')
+  (10001, '13800000000', '火花用户', 'https://img.niantu.cn/spark-mall/static/images/default-avatar.png', 268.80, 3600, '未知', 1, 'mock-open-id', 'mock-token-001'),
+  (90001, '13800123456', 'admin', 'https://img.niantu.cn/spark-mall/static/images/default-avatar.png', 1288.66, 9680, '未知', 1, 'mock-admin-open-id', 'mock-token-admin')
 on conflict (id) do update set
   phone = excluded.phone,
   username = excluded.username,
@@ -116,6 +117,29 @@ insert into orders (
 )
 values
   (1, 'MOCKBOX202605260001', 10001, 1, 1, 0, 19.90, 1, '[]', '[]', '{"id":1,"contactName":"火花用户","contactPhone":"13800138000","province":"浙江省","city":"杭州市","district":"西湖区","detailAddress":"文三路 100 号 mock 地址","isDefault":1}', '盲盒待开订单', 'https://picsum.photos/seed/spark-mall-box-detail-new/750/900')
+on conflict (id) do update set
+  order_no = excluded.order_no,
+  user_id = excluded.user_id,
+  box_id = excluded.box_id,
+  order_type = excluded.order_type,
+  status = excluded.status,
+  total_price = excluded.total_price,
+  product_count = excluded.product_count,
+  product_list = excluded.product_list,
+  exchange_list = excluded.exchange_list,
+  address = excluded.address,
+  content = excluded.content,
+  detail_img = excluded.detail_img;
+
+insert into orders (
+  id, order_no, user_id, box_id, order_type, status, total_price,
+  product_count, product_list, exchange_list, address, content, detail_img
+)
+values
+  (90001, 'ADMIN202605280001', 90001, null, 2, 0, 199.00, 2, '[{"id":1,"productName":"火花精选商品1","name":"火花精选商品1","productGrade":"N","premium":"46.00","storePageIcon":"https://picsum.photos/seed/spark-mall-product-1/600/600","icon":"https://picsum.photos/seed/spark-mall-product-1/600/600","count":1},{"id":2,"productName":"火花精选商品2","name":"火花精选商品2","productGrade":"R","premium":"53.00","storePageIcon":"https://picsum.photos/seed/spark-mall-product-2/600/600","icon":"https://picsum.photos/seed/spark-mall-product-2/600/600","count":1}]', '[]', '{"id":9001,"contactName":"演示管理员","contactPhone":"13800123456","province":"浙江省","city":"杭州市","district":"西湖区","detailAddress":"火花商城演示中心 6 号楼 1201","isDefault":1}', 'admin 演示待付款订单', 'https://picsum.photos/seed/spark-mall-admin-order-detail-1/750/420'),
+  (90002, 'ADMIN202605280002', 90001, null, 2, 1, 268.00, 1, '[{"id":5,"productName":"火花精选商品5","name":"火花精选商品5","productGrade":"N","premium":"74.00","storePageIcon":"https://picsum.photos/seed/spark-mall-product-5/600/600","icon":"https://picsum.photos/seed/spark-mall-product-5/600/600","count":1}]', '[]', '{"id":9001,"contactName":"演示管理员","contactPhone":"13800123456","province":"浙江省","city":"杭州市","district":"西湖区","detailAddress":"火花商城演示中心 6 号楼 1201","isDefault":1}', 'admin 演示待发货订单', 'https://picsum.photos/seed/spark-mall-admin-order-detail-2/750/420'),
+  (90003, 'ADMIN202605280003', 90001, null, 3, 2, 8.00, 1, '[{"id":3,"productName":"火花精选商品3","name":"火花精选商品3","productGrade":"SR","premium":"60.00","storePageIcon":"https://picsum.photos/seed/spark-mall-product-3/600/600","icon":"https://picsum.photos/seed/spark-mall-product-3/600/600","count":1}]', '[{"id":4,"productName":"火花精选商品4","name":"火花精选商品4","productGrade":"SSR","premium":"67.00","storePageIcon":"https://picsum.photos/seed/spark-mall-product-4/600/600","icon":"https://picsum.photos/seed/spark-mall-product-4/600/600","count":1}]', '{"id":9001,"contactName":"演示管理员","contactPhone":"13800123456","province":"浙江省","city":"杭州市","district":"西湖区","detailAddress":"火花商城演示中心 6 号楼 1201","isDefault":1}', 'admin 演示待收货积分订单', 'https://picsum.photos/seed/spark-mall-admin-order-detail-3/750/420'),
+  (90004, 'ADMIN202605280004', 90001, null, 2, 3, 76.00, 1, '[{"id":6,"productName":"火花精选商品6","name":"火花精选商品6","productGrade":"R","premium":"81.00","storePageIcon":"https://picsum.photos/seed/spark-mall-product-6/600/600","icon":"https://picsum.photos/seed/spark-mall-product-6/600/600","count":1}]', '[]', '{"id":9001,"contactName":"演示管理员","contactPhone":"13800123456","province":"浙江省","city":"杭州市","district":"西湖区","detailAddress":"火花商城演示中心 6 号楼 1201","isDefault":1}', 'admin 演示已完成订单', 'https://picsum.photos/seed/spark-mall-admin-order-detail-4/750/420')
 on conflict (id) do update set
   order_no = excluded.order_no,
   user_id = excluded.user_id,

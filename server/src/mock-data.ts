@@ -16,6 +16,20 @@ export const mockUser = {
   token: 'mock-token-001',
 }
 
+export const mockAdminUser = {
+  id: '90001',
+  open_id: 'mock-admin-open-id',
+  username: 'admin',
+  nickName: '演示管理员',
+  phone: '13800123456',
+  balance: 1288.66,
+  points: 9680,
+  sex: '未知',
+  avatar: 'https://img.niantu.cn/spark-mall/static/images/default-avatar.png',
+  isAgent: 1,
+  token: 'mock-token-admin',
+}
+
 export const mockCategories = [
   { cateId: 1, cateName: '潮玩手办', icon: image('cate-toy', 160, 160) },
   { cateId: 2, cateName: '数码周边', icon: image('cate-digital', 160, 160) },
@@ -116,6 +130,19 @@ export const mockAddress = {
   isDefault: 1,
 }
 
+export const mockAdminAddress = {
+  id: 9001,
+  userId: 90001,
+  contactName: '演示管理员',
+  contactPhone: '13800123456',
+  province: '浙江省',
+  city: '杭州市',
+  district: '西湖区',
+  detailAddress: '火花商城演示中心 6 号楼 1201',
+  areaValues: '330000,330100,330106',
+  isDefault: 1,
+}
+
 export const mockOrders: OrderRow[] = [
   {
     id: 1,
@@ -152,6 +179,81 @@ export const mockOrders: OrderRow[] = [
     address: mockAddress,
     content: '积分兑换 mock 订单',
     detail_img: image('order-detail-2', 750, 420),
+  },
+]
+
+export const mockAdminOrders: OrderRow[] = [
+  {
+    id: 90001,
+    order_no: 'ADMIN202605280001',
+    order_type: 2,
+    status: 0,
+    total_price: '199.00',
+    shipping_fee: '8.00',
+    total_points: '0',
+    exchange_total_points: '0',
+    created_at: '2026-05-28 10:20:00',
+    expire_time: '2026-05-28 23:59:59',
+    product_count: 2,
+    product_list: [{ ...mockProducts[0], count: 1 }, { ...mockProducts[1], count: 1 }],
+    exchange_list: [],
+    address: mockAdminAddress,
+    content: 'admin 演示待付款订单',
+    detail_img: image('admin-order-detail-1', 750, 420),
+  },
+  {
+    id: 90002,
+    order_no: 'ADMIN202605280002',
+    order_type: 2,
+    status: 1,
+    total_price: '268.00',
+    shipping_fee: '0.00',
+    total_points: '0',
+    exchange_total_points: '0',
+    created_at: '2026-05-27 16:30:00',
+    expire_time: '2026-05-27 23:59:59',
+    product_count: 1,
+    product_list: [{ ...mockProducts[4], count: 1 }],
+    exchange_list: [],
+    address: mockAdminAddress,
+    content: 'admin 演示待发货订单',
+    detail_img: image('admin-order-detail-2', 750, 420),
+  },
+  {
+    id: 90003,
+    order_no: 'ADMIN202605280003',
+    order_type: 3,
+    status: 2,
+    total_price: '8.00',
+    shipping_fee: '8.00',
+    total_points: '1280',
+    exchange_total_points: '520',
+    created_at: '2026-05-26 09:45:00',
+    expire_time: '2026-05-26 23:59:59',
+    product_count: 1,
+    product_list: [{ ...mockProducts[2], count: 1 }],
+    exchange_list: [{ ...mockProducts[3], count: 1 }],
+    address: mockAdminAddress,
+    content: 'admin 演示待收货积分订单',
+    detail_img: image('admin-order-detail-3', 750, 420),
+  },
+  {
+    id: 90004,
+    order_no: 'ADMIN202605280004',
+    order_type: 2,
+    status: 3,
+    total_price: '76.00',
+    shipping_fee: '0.00',
+    total_points: '0',
+    exchange_total_points: '0',
+    created_at: '2026-05-25 14:10:00',
+    expire_time: '2026-05-25 23:59:59',
+    product_count: 1,
+    product_list: [{ ...mockProducts[5], count: 1 }],
+    exchange_list: [],
+    address: mockAdminAddress,
+    content: 'admin 演示已完成订单',
+    detail_img: image('admin-order-detail-4', 750, 420),
   },
 ]
 

@@ -48,6 +48,31 @@ const userInfo = {
   openId: 'mock-open-id',
 }
 
+const adminToken = 'mock-token-admin'
+
+const adminUserInfo = {
+  isAgent: 1,
+  id: '90001',
+  open_id: 'mock-admin-open-id',
+  username: 'admin',
+  nickName: '演示管理员',
+  phone: '13800123456',
+  balance: 1288.66,
+  points: 9680,
+  sex: '未知',
+  avatar: 'https://img.niantu.cn/spark-mall/static/images/default-avatar.png',
+  token: adminToken,
+  openId: 'mock-admin-open-id',
+}
+
+const getRequestToken = req => {
+  const authorizationToken = req.headers.authorization?.replace(/^Bearer\s+/i, '')
+  const xToken = Array.isArray(req.headers['x-token']) ? req.headers['x-token'][0] : req.headers['x-token']
+  return xToken || authorizationToken || ''
+}
+
+const isAdminRequest = req => getRequestToken(req) === adminToken
+
 const categories = [
   { cateId: 1, cateName: '潮玩手办', icon: image('cate-toy', 160, 160) },
   { cateId: 2, cateName: '数码周边', icon: image('cate-digital', 160, 160) },
@@ -91,6 +116,21 @@ const addressList = [
     city: '杭州市',
     district: '西湖区',
     detailAddress: '文三路 100 号 mock 地址',
+    isDefault: 1,
+  },
+]
+
+const adminAddressList = [
+  {
+    id: 9001,
+    userId: 90001,
+    contactName: '演示管理员',
+    contactPhone: '13800123456',
+    province: '浙江省',
+    city: '杭州市',
+    district: '西湖区',
+    detailAddress: '火花商城演示中心 6 号楼 1201',
+    areaValues: '330000,330100,330106',
     isDefault: 1,
   },
 ]
@@ -155,6 +195,81 @@ const orders = [
   },
 ]
 
+const adminOrders = [
+  {
+    id: 90001,
+    orderNo: 'ADMIN202605280001',
+    orderType: 2,
+    status: 0,
+    totalPrice: '199.00',
+    shippingFee: '8.00',
+    totalPoints: '0',
+    exchangeTotalPoints: '0',
+    created_at: '2026-05-28 10:20:00',
+    expireTime: '2026-05-28 23:59:59',
+    productCount: 2,
+    productList: [{ ...products[0], count: 1 }, { ...products[1], count: 1 }],
+    exchangeList: [],
+    address: adminAddressList[0],
+    content: 'admin 演示待付款订单',
+    detailImg: image('admin-order-detail-1', 750, 420),
+  },
+  {
+    id: 90002,
+    orderNo: 'ADMIN202605280002',
+    orderType: 2,
+    status: 1,
+    totalPrice: '268.00',
+    shippingFee: '0.00',
+    totalPoints: '0',
+    exchangeTotalPoints: '0',
+    created_at: '2026-05-27 16:30:00',
+    expireTime: '2026-05-27 23:59:59',
+    productCount: 1,
+    productList: [{ ...products[4], count: 1 }],
+    exchangeList: [],
+    address: adminAddressList[0],
+    content: 'admin 演示待发货订单',
+    detailImg: image('admin-order-detail-2', 750, 420),
+  },
+  {
+    id: 90003,
+    orderNo: 'ADMIN202605280003',
+    orderType: 3,
+    status: 2,
+    totalPrice: '8.00',
+    shippingFee: '8.00',
+    totalPoints: '1280',
+    exchangeTotalPoints: '520',
+    created_at: '2026-05-26 09:45:00',
+    expireTime: '2026-05-26 23:59:59',
+    productCount: 1,
+    productList: [{ ...products[2], count: 1 }],
+    exchangeList: [{ ...products[3], count: 1 }],
+    address: adminAddressList[0],
+    content: 'admin 演示待收货积分订单',
+    detailImg: image('admin-order-detail-3', 750, 420),
+  },
+  {
+    id: 90004,
+    orderNo: 'ADMIN202605280004',
+    orderType: 2,
+    status: 3,
+    totalPrice: '76.00',
+    shippingFee: '0.00',
+    totalPoints: '0',
+    exchangeTotalPoints: '0',
+    created_at: '2026-05-25 14:10:00',
+    expireTime: '2026-05-25 23:59:59',
+    productCount: 1,
+    productList: [{ ...products[5], count: 1 }],
+    exchangeList: [],
+    address: adminAddressList[0],
+    content: 'admin 演示已完成订单',
+    detailImg: image('admin-order-detail-4', 750, 420),
+  },
+]
+
 const boxList = [
   {
     id: 1,
@@ -194,6 +309,14 @@ app.get('/health', (_req, res) => {
 
 app.post('/user/login', (req, res) => {
   const phone = req.body?.phone || userInfo.phone
+  const password = String(req.body?.password || '')
+  if (String(phone).trim().toLowerCase() === 'admin' && password === '123456') {
+    return res.json(success({
+      token: adminToken,
+      userInfo: adminUserInfo,
+    }))
+  }
+
   res.json(success({
     token: userInfo.token,
     userInfo: {
@@ -207,12 +330,12 @@ app.post('/user/register', (_req, res) => {
   res.json(success({ token: userInfo.token, userInfo }))
 })
 
-app.get('/user/info', (_req, res) => {
-  res.json(success(userInfo))
+app.get('/user/info', (req, res) => {
+  res.json(success(isAdminRequest(req) ? adminUserInfo : userInfo))
 })
 
-app.get('/user/address/list', (_req, res) => {
-  res.json(success(addressList))
+app.get('/user/address/list', (req, res) => {
+  res.json(success(isAdminRequest(req) ? adminAddressList : addressList))
 })
 
 app.get('/user/address/create', (req, res) => {
@@ -371,13 +494,15 @@ app.get('/product/exchangeProduct', (req, res) => {
 
 app.get('/order/orderList', (req, res) => {
   const status = req.query.status === undefined ? null : Number(req.query.status)
-  const list = status === null ? orders : orders.filter(item => item.status === status)
+  const sourceOrders = isAdminRequest(req) ? adminOrders : orders
+  const list = status === null ? sourceOrders : sourceOrders.filter(item => item.status === status)
   const { list: orderList, pagination } = paginate(list, req.query)
   res.json(success({ orderList, pagination }))
 })
 
 app.get('/order/orderDetail', (req, res) => {
-  const order = orders.find(item => item.orderNo === req.query.orderNo) || orders[0]
+  const sourceOrders = isAdminRequest(req) ? adminOrders : orders
+  const order = sourceOrders.find(item => item.orderNo === req.query.orderNo) || sourceOrders[0]
   res.json(success(order))
 })
 

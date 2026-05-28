@@ -1,19 +1,27 @@
-import express from 'express'
+import expressApp, { type Request } from 'express'
 import cors from 'cors'
+import { randomBytes, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto'
+import { promisify } from 'node:util'
 import { getSupabase, hasSupabaseConfig } from './supabase.js'
 import { failure, success } from './response.js'
 import { mapBanner, mapBox, mapBoxProduct, mapConsignment, mapHomeBox, mapOrder, mapProduct, mapProductCategory, mapUserBoxProduct } from './mappers.js'
-import { getMockProductRows, mockAddress, mockBoxes, mockCategories, mockConsignments, mockHome, mockMessages, mockOrders, mockUser, mockUserBoxProducts } from './mock-data.js'
+import { getMockProductRows, mockAddress, mockAdminAddress, mockAdminOrders, mockAdminUser, mockBoxes, mockCategories, mockConsignments, mockHome, mockMessages, mockOrders, mockUser, mockUserBoxProducts } from './mock-data.js'
 import type { BannerRow, ConsignmentRow, OrderRow, ProductBoxRow, ProductCategoryRow, ProductRow, UserBoxProductRow } from './types.js'
 
-const app = express()
+const app = expressApp()
 const port = Number(process.env.PORT || 3001)
 const TEST_PHONE = '13800000000'
 const TEST_TOKEN = 'mock-token-001'
+const ADMIN_ACCOUNT = 'admin'
+const ADMIN_PASSWORD = '123456'
+const ADMIN_TOKEN = 'mock-token-admin'
+const PASSWORD_HASH_PREFIX = 'scrypt'
+const TOKEN_PREFIX = 'sm'
+const scrypt = promisify(scryptCallback)
 
 app.use(cors())
-app.use(express.json())
-app.use(express.urlencoded({ extended: true }))
+app.use(expressApp.json())
+app.use(expressApp.urlencoded({ extended: true }))
 
 const getPagination = (total: number, page: number, pageSize: number) => ({
   total,
@@ -25,6 +33,8 @@ const getPagination = (total: number, page: number, pageSize: number) => ({
 const useMockData = () => !hasSupabaseConfig()
 
 const createOrderNo = (prefix = 'SM') => `${prefix}${Date.now()}${Math.floor(Math.random() * 1000)}`
+
+const createToken = () => `${TOKEN_PREFIX}_${randomBytes(32).toString('hex')}`
 
 const DEFAULT_USER_ID = 10001
 
@@ -39,7 +49,84 @@ function paginate<T>(list: T[], page: number, pageSize: number) {
 }
 
 function getMockOrder(orderNo: unknown) {
-  return mockOrders.find(item => item.order_no === String(orderNo)) ?? mockOrders[0]
+  const orders = [...mockAdminOrders, ...mockOrders]
+  return orders.find(item => item.order_no === String(orderNo)) ?? orders[0]
+}
+
+function isAdminToken(token: unknown) {
+  return String(token || '') === ADMIN_TOKEN || String(token || '') === mockAdminUser.token
+}
+
+function isAdminLogin(req: Request) {
+  const account = String(req.body?.phone || req.body?.username || '').trim()
+  const password = String(req.body?.password || '')
+  return account.toLowerCase() === ADMIN_ACCOUNT && password === ADMIN_PASSWORD
+}
+
+function getRequestToken(req: Request) {
+  const authorizationToken = req.headers.authorization?.replace(/^Bearer\s+/i, '')
+  const xToken = Array.isArray(req.headers['x-token']) ? req.headers['x-token'][0] : req.headers['x-token']
+  return xToken || authorizationToken || ''
+}
+
+type AuthUserRow = {
+  id: number
+  phone: string | null
+  password?: string | null
+  username: string | null
+  avatar: string | null
+  balance: number | string | null
+  points: number | null
+  sex: string | null
+  is_agent: number | null
+  open_id: string | null
+  token: string | null
+}
+
+function mapAuthUser(data: AuthUserRow, token = data.token || '') {
+  return {
+    id: String(data.id),
+    open_id: data.open_id,
+    username: data.username,
+    phone: data.phone,
+    balance: data.balance ?? 0,
+    points: data.points ?? 0,
+    sex: data.sex ?? '',
+    avatar: data.avatar ?? '',
+    isAgent: data.is_agent ?? 0,
+    token,
+  }
+}
+
+function normalizePhone(value: unknown) {
+  return String(value || '').trim()
+}
+
+function normalizePassword(value: unknown) {
+  return String(value || '')
+}
+
+async function hashPassword(password: string) {
+  const salt = randomBytes(16).toString('hex')
+  const derivedKey = await scrypt(password, salt, 64) as Buffer
+
+  return `${PASSWORD_HASH_PREFIX}$${salt}$${derivedKey.toString('hex')}`
+}
+
+async function verifyPassword(password: string, savedPassword: string | null | undefined) {
+  if (!savedPassword) {
+    return false
+  }
+
+  const [prefix, salt, savedHash] = savedPassword.split('$')
+  if (prefix !== PASSWORD_HASH_PREFIX || !salt || !savedHash) {
+    return password === savedPassword
+  }
+
+  const savedHashBuffer = Buffer.from(savedHash, 'hex')
+  const derivedKey = await scrypt(password, salt, savedHashBuffer.length) as Buffer
+
+  return savedHashBuffer.length === derivedKey.length && timingSafeEqual(savedHashBuffer, derivedKey)
 }
 
 async function getSupabaseProduct(productId: number) {
@@ -258,6 +345,16 @@ app.get('/health', (_req, res) => {
 
 app.post('/user/login', async (req, res) => {
   try {
+    if (isAdminLogin(req)) {
+      return success(res, {
+        token: ADMIN_TOKEN,
+        userInfo: {
+          ...mockAdminUser,
+          token: ADMIN_TOKEN,
+        },
+      })
+    }
+
     if (useMockData()) {
       const phone = String(req.body?.phone || mockUser.phone)
 
@@ -272,11 +369,16 @@ app.post('/user/login', async (req, res) => {
     }
 
     const supabase = getSupabase()
-    const phone = String(req.body?.phone || TEST_PHONE)
+    const phone = normalizePhone(req.body?.phone)
+    const password = normalizePassword(req.body?.password)
+
+    if (!phone || !password) {
+      return failure(res, '手机号和密码不能为空', 400)
+    }
 
     const { data, error } = await supabase
       .from('users')
-      .select('id, phone, username, avatar, balance, points, sex, is_agent, open_id, token')
+      .select('id, phone, password, username, avatar, balance, points, sex, is_agent, open_id, token')
       .eq('phone', phone)
       .maybeSingle()
 
@@ -284,24 +386,31 @@ app.post('/user/login', async (req, res) => {
       throw error
     }
 
-    const token = TEST_TOKEN
+    if (!data) {
+      return failure(res, '用户不存在', 401)
+    }
+
+    const isPasswordValid = await verifyPassword(password, data.password)
+
+    if (!isPasswordValid) {
+      return failure(res, '手机号或密码错误', 401)
+    }
+
+    const token = createToken()
+    const { data: updatedUser, error: updateError } = await supabase
+      .from('users')
+      .update({ token })
+      .eq('id', data.id)
+      .select('id, phone, username, avatar, balance, points, sex, is_agent, open_id, token')
+      .single()
+
+    if (updateError) {
+      throw updateError
+    }
 
     success(res, {
       token,
-      userInfo: data
-        ? {
-            id: String(data.id),
-            open_id: data.open_id,
-            username: data.username,
-            phone: data.phone,
-            balance: data.balance ?? 0,
-            points: data.points ?? 0,
-            sex: data.sex ?? '',
-            avatar: data.avatar ?? '',
-            isAgent: data.is_agent ?? 0,
-            token,
-          }
-        : null,
+      userInfo: mapAuthUser(updatedUser as AuthUserRow, token),
     })
   }
   catch (error) {
@@ -312,6 +421,14 @@ app.post('/user/login', async (req, res) => {
 
 app.get('/user/info', async (req, res) => {
   try {
+    const requestToken = getRequestToken(req)
+    if (isAdminToken(requestToken)) {
+      return success(res, {
+        ...mockAdminUser,
+        token: ADMIN_TOKEN,
+      })
+    }
+
     if (useMockData()) {
       return success(res, {
         ...mockUser,
@@ -320,44 +437,28 @@ app.get('/user/info', async (req, res) => {
     }
 
     const supabase = getSupabase()
-    const userId = req.query.id
-    const authorizationToken = req.headers.authorization?.replace(/^Bearer\s+/i, '')
-    const xToken = Array.isArray(req.headers['x-token']) ? req.headers['x-token'][0] : req.headers['x-token']
-    const token = xToken || authorizationToken || TEST_TOKEN
-    let query = supabase
+    const token = requestToken
+
+    if (!token) {
+      return failure(res, '未登录', 401)
+    }
+
+    const { data, error } = await supabase
       .from('users')
       .select('id, phone, username, avatar, balance, points, sex, is_agent, open_id, token')
-
-    if (userId) {
-      query = query.eq('id', userId)
-    }
-    else if (token === TEST_TOKEN) {
-      query = query.eq('phone', TEST_PHONE)
-    }
-    else {
-      query = query.eq('token', token)
-    }
-
-    const { data, error } = await query.limit(1).maybeSingle()
+      .eq('token', token)
+      .limit(1)
+      .maybeSingle()
 
     if (error) {
       throw error
     }
 
-    success(res, data
-      ? {
-          id: String(data.id),
-          open_id: data.open_id,
-          username: data.username,
-          phone: data.phone,
-          balance: data.balance ?? 0,
-          points: data.points ?? 0,
-          sex: data.sex ?? '',
-          avatar: data.avatar ?? '',
-          isAgent: data.is_agent ?? 0,
-          token: TEST_TOKEN,
-        }
-      : null)
+    if (!data) {
+      return failure(res, '登录已失效', 401)
+    }
+
+    success(res, mapAuthUser(data as AuthUserRow, token))
   }
   catch (error) {
     console.error(error)
@@ -367,15 +468,69 @@ app.get('/user/info', async (req, res) => {
 
 app.post('/user/register', async (req, res) => {
   try {
-    const phone = String(req.body?.phone || TEST_PHONE)
+    if (useMockData()) {
+      const phone = String(req.body?.phone || mockUser.phone)
+
+      return success(res, {
+        token: TEST_TOKEN,
+        userInfo: {
+          ...mockUser,
+          phone,
+          token: TEST_TOKEN,
+        },
+      })
+    }
+
+    const supabase = getSupabase()
+    const phone = normalizePhone(req.body?.phone)
+    const password = normalizePassword(req.body?.password)
+
+    if (!phone || !password) {
+      return failure(res, '手机号和密码不能为空', 400)
+    }
+
+    if (password.length < 6) {
+      return failure(res, '密码至少6个字符', 400)
+    }
+
+    const { data: existingUser, error: existingError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('phone', phone)
+      .maybeSingle()
+
+    if (existingError) {
+      throw existingError
+    }
+
+    if (existingUser) {
+      return failure(res, '手机号已注册', 409)
+    }
+
+    const token = createToken()
+    const { data, error } = await supabase
+      .from('users')
+      .insert({
+        phone,
+        password: await hashPassword(password),
+        username: `用户${phone.slice(-4)}`,
+        avatar: 'https://img.niantu.cn/spark-mall/static/images/default-avatar.png',
+        balance: 0,
+        points: 0,
+        sex: '',
+        is_agent: 0,
+        token,
+      })
+      .select('id, phone, username, avatar, balance, points, sex, is_agent, open_id, token')
+      .single()
+
+    if (error) {
+      throw error
+    }
 
     success(res, {
-      token: TEST_TOKEN,
-      userInfo: {
-        ...mockUser,
-        phone,
-        token: TEST_TOKEN,
-      },
+      token,
+      userInfo: mapAuthUser(data as AuthUserRow, token),
     })
   }
   catch (error) {
@@ -384,8 +539,8 @@ app.post('/user/register', async (req, res) => {
   }
 })
 
-app.get('/user/address/list', async (_req, res) => {
-  success(res, [mockAddress])
+app.get('/user/address/list', async (req, res) => {
+  success(res, isAdminToken(getRequestToken(req)) ? [mockAdminAddress] : [mockAddress])
 })
 
 app.get('/user/address/create', async (req, res) => {
@@ -899,6 +1054,19 @@ app.get('/order/orderList', async (req, res) => {
   try {
     const page = Number(req.query.page || 1)
     const pageSize = Number(req.query.pageSize || 10)
+    const isAdmin = isAdminToken(getRequestToken(req))
+
+    if (isAdmin) {
+      let orders = mockAdminOrders
+      if (req.query.status !== undefined) {
+        orders = orders.filter(item => item.status === Number(req.query.status))
+      }
+      const { list, pagination } = paginate(orders, page, pageSize)
+      return success(res, {
+        orderList: list.map(mapOrder),
+        pagination,
+      })
+    }
 
     if (useMockData()) {
       let orders = mockOrders
@@ -948,6 +1116,10 @@ app.get('/order/orderList', async (req, res) => {
 
 app.get('/order/orderDetail', async (req, res) => {
   try {
+    if (isAdminToken(getRequestToken(req))) {
+      return success(res, mapOrder(getMockOrder(req.query.orderNo)))
+    }
+
     if (useMockData()) {
       return success(res, mapOrder(getMockOrder(req.query.orderNo)))
     }
