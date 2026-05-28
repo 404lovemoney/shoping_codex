@@ -11,7 +11,7 @@ const playBackgroundMusic = () => {
 
   if (!bgm) {
     bgm = uni.createInnerAudioContext()
-    bgm.src = '/static/audio/base.mp3'
+    // bgm.src = '/static/audio/base.mp3'
     bgm.loop = true
     bgm.autoplay = true
     bgm.onError((err) => console.error('音乐播放失败:', err))

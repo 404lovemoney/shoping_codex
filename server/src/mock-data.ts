@@ -1,4 +1,4 @@
-import type { OrderRow, ProductRow } from './types.js'
+import type { ConsignmentRow, OrderRow, ProductRow, UserBoxProductRow } from './types.js'
 
 const image = (seed: string, width = 600, height = 600) =>
   `https://picsum.photos/seed/spark-mall-${seed}/${width}/${height}`
@@ -152,6 +152,74 @@ export const mockOrders: OrderRow[] = [
     address: mockAddress,
     content: '积分兑换 mock 订单',
     detail_img: image('order-detail-2', 750, 420),
+  },
+]
+
+function createBoxProductSnapshot(product = mockProducts[0]) {
+  return {
+    id: product.id,
+    productName: product.productName,
+    productGrade: product.productGrade,
+    premium: product.premium,
+    exchangePrice: product.exchangePrice,
+    dismantlePrice: product.dismantlePrice,
+    shippingFee: product.shippingFee,
+    storePageIcon: product.storePageIcon,
+    icon: product.storePageIcon,
+    productDetailAdImage: product.productDetailAdImage,
+    productDetailImages: product.productDetailImages,
+  }
+}
+
+export const mockUserBoxProducts: UserBoxProductRow[] = [
+  {
+    id: 101,
+    user_id: 10001,
+    product_id: 1,
+    source_order_no: 'MOCKBOX202605260001',
+    status: 0,
+    price: 46,
+    product_snapshot: createBoxProductSnapshot(mockProducts[0]),
+    created_at: '2026-05-26 10:00:00',
+  },
+  {
+    id: 102,
+    user_id: 10001,
+    product_id: 2,
+    source_order_no: 'MOCKBOX202605260002',
+    status: 1,
+    price: 53,
+    product_snapshot: createBoxProductSnapshot(mockProducts[1]),
+    created_at: '2026-05-26 11:00:00',
+  },
+  {
+    id: 103,
+    user_id: 10001,
+    product_id: 3,
+    source_order_no: 'MOCKBOX202605260003',
+    status: 2,
+    price: 60,
+    sell_price: 72,
+    product_snapshot: createBoxProductSnapshot(mockProducts[2]),
+    created_at: '2026-05-26 12:00:00',
+  },
+]
+
+export const mockConsignments: ConsignmentRow[] = [
+  {
+    id: 201,
+    user_id: 10001,
+    user_box_product_id: 103,
+    status: 0,
+    sell_price: 72,
+    product_snapshot: createBoxProductSnapshot(mockProducts[2]),
+    created_at: '2026-05-26 12:30:00',
+    user_box_product: mockUserBoxProducts[2],
+    users: {
+      id: 10001,
+      username: mockUser.username,
+      avatar: mockUser.avatar,
+    },
   },
 ]
 

@@ -44,6 +44,7 @@ export type ProductCategoryRow = {
 export type OrderRow = {
   id: number
   order_no?: string | null
+  box_id?: number | null
   order_type?: number | null
   status?: number | null
   total_price?: string | number | null
@@ -66,4 +67,63 @@ export type BannerRow = {
   box_id?: number | null
   img_src?: string | null
   detail_img?: string | null
+}
+
+export type ProductBoxRow = {
+  id: number
+  box_id?: number | null
+  name?: string | null
+  description?: string | null
+  img_src?: string | null
+  bg_type?: number | null
+  icon_type?: number | null
+  price?: string | number | null
+  first_price?: string | number | null
+  discount_price?: string | number | null
+  prize_price_limit?: string | null
+  type?: number | null
+  detail_img?: string | null
+  sort?: number | null
+  created_at?: string | null
+}
+
+export type ProductBoxItemRow = {
+  id: number
+  box_id?: number | null
+  product_id?: number | null
+  draw_weight?: number | null
+  product?: ProductRow | null
+  products?: ProductRow | null
+}
+
+export type UserBoxProductRow = {
+  id: number
+  user_id?: number | null
+  product_id?: number | null
+  source_order_no?: string | null
+  status?: number | null
+  price?: string | number | null
+  sell_price?: string | number | null
+  product_snapshot?: unknown
+  created_at?: string | null
+  updated_at?: string | null
+  product?: ProductRow | null
+  products?: ProductRow | null
+}
+
+export type ConsignmentRow = {
+  id: number
+  user_id?: number | null
+  user_box_product_id?: number | null
+  status?: number | null
+  sell_price?: string | number | null
+  product_snapshot?: unknown
+  created_at?: string | null
+  updated_at?: string | null
+  user_box_product?: UserBoxProductRow | null
+  users?: {
+    id?: number | null
+    username?: string | null
+    avatar?: string | null
+  } | null
 }
