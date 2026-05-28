@@ -1,7 +1,7 @@
 <script setup lang="ts">
 
 import { fetchOrderList } from '@/api/order'
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 
 // 获取屏幕边界到安全区域距离
 const { safeAreaInsets } = uni.getSystemInfoSync()
@@ -11,8 +11,15 @@ const props = defineProps<{
   orderState: number
 }>()
 
+const defaultPagination = {
+  total: 0,
+  pageSize: 5,
+  currentPage: 1,
+  lastPage: 1,
+}
+
 // 请求参数
-let queryParams = {
+const queryParams = {
   page: 1,
   pageSize: 5,
   status: props.orderState,
@@ -23,6 +30,61 @@ const orderList = ref<any[]>([])
 
 // 是否加载中标记，用于防止滚动触底触发多次请求
 const isLoading = ref(false)
+const loadError = ref('')
+
+const normalizeOrderListResponse = (res: any) => {
+  return {
+    orderList: Array.isArray(res?.orderList) ? res.orderList : [],
+    pagination: {
+      ...defaultPagination,
+      ...(res?.pagination || {}),
+    },
+  }
+}
+
+const safeText = (value: unknown, fallback = '-') => {
+  if (value === null || value === undefined || value === '') {
+    return fallback
+  }
+  return String(value)
+}
+
+const orderStateList = [
+  { id: 0, text: '待付款', color: '#FB0A01' },
+  { id: 1, text: '待发货', color: '#FA8C16' },
+  { id: 2, text: '待收货', color: '#27BA9B' },
+  { id: 3, text: '已完成', color: '#666666' },
+  { id: 4, text: '已取消', color: '#999999' },
+]
+
+const getOrderStatus = (status: number) => {
+  return orderStateList.find(item => item.id === Number(status)) || { id: status, text: '未知状态', color: '#999999' }
+}
+
+const getProductList = (order: any) => {
+  return Array.isArray(order?.productList) ? order.productList : []
+}
+
+const getProductCount = (order: any) => {
+  const count = Number(order?.productCount || 0)
+  if (count) return count
+  return getProductList(order).reduce((total, product) => total + Number(product?.count || 0), 0)
+}
+
+const formatMoney = (value: unknown) => safeText(value, '0.00')
+
+const openOrderDetail = (order: any) => {
+  if (!order?.orderNo) {
+    uni.showToast({
+      title: '订单编号缺失',
+      icon: 'none',
+    })
+    return
+  }
+  uni.navigateTo({
+    url: `/pages-order/detail/index?orderNo=${order.orderNo}&orderType=${order.orderType || ''}`,
+  })
+}
 
 // 获取订单列表
 const fetchOrderListHandle = async () => {
@@ -30,10 +92,11 @@ const fetchOrderListHandle = async () => {
   if (isLoading.value) return
   // 退出分页判断
   if (isFinish.value === true) {
-    return uni.showToast({ icon: 'none', title: '没有更多数据~' })
+    return
   }
   // 发送请求前，标记为加载中
   isLoading.value = true
+  loadError.value = ''
 
 
   const params = Object.assign({}, queryParams);
@@ -45,22 +108,32 @@ const fetchOrderListHandle = async () => {
 
   // console.log('params', params)
 
-  // 发送请求
-  const res = await fetchOrderList(params)
+  try {
+    // 发送请求
+    const res = normalizeOrderListResponse(await fetchOrderList(params))
 
-  // 发送请求后，重置标记
-  isLoading.value = false
+    // 数组追加
+    orderList.value.push(...res.orderList)
 
-  // 数组追加
-  orderList.value.push(...res.orderList)
-
-  // 分页条件
-  if (queryParams.page < res.pagination.lastPage) {
-    // 页码累加
-    queryParams.page++
-  } else {
-    // 分页已结束
-    isFinish.value = true
+    // 分页条件
+    if (queryParams.page < Number(res.pagination.lastPage || 1)) {
+      // 页码累加
+      queryParams.page++
+    } else {
+      // 分页已结束
+      isFinish.value = true
+    }
+  }
+  catch (error: any) {
+    loadError.value = error.message || '订单加载失败'
+    uni.showToast({
+      title: loadError.value,
+      icon: 'none',
+    })
+  }
+  finally {
+    // 发送请求后，重置标记
+    isLoading.value = false
   }
 }
 
@@ -87,13 +160,7 @@ const onRefresherrefresh = async () => {
   isTriggered.value = false
 }
 
-const orderStateList = [
-  { id: 0, text: '待付款' },
-  { id: 1, text: '待发货' },
-  { id: 2, text: '待收货' },
-  { id: 3, text: '已完成' },
-  { id: 4, text: '已取消' },
-]
+const showEmpty = computed(() => !isLoading.value && orderList.value.length === 0)
 
 </script>
 
@@ -107,19 +174,18 @@ const orderStateList = [
     @refresherrefresh="onRefresherrefresh"
     @scrolltolower="fetchOrderListHandle"
   >
-    <view class="card" v-for="order in orderList" :key="order.id">
+    <view class="card" v-for="order in orderList" :key="order.id || order.orderNo" @click="openOrderDetail(order)">
       <!-- 订单信息 -->
       <view class="status">
-        <text class="date">订单时间：{{ order.created_at }}</text>
+        <text class="date">订单编号：{{ safeText(order.orderNo) }}</text>
         <!-- 订单状态文字 -->
-        <text :style="{ color: order.status === 0 ? '#FB0A01' : '' }">{{ orderStateList[order.status].text }}</text>
+        <text :style="{ color: getOrderStatus(order.status).color }">{{ getOrderStatus(order.status).text }}</text>
       </view>
-      <navigator
+      <view class="order-time">下单时间：{{ safeText(order.created_at) }}</view>
+      <view
         class="product-list"
-        v-for="product in order.productList"
-        :key="product.id"
-        :url="`/pages-order/detail/index?orderNo=${order.orderNo}&orderType=${order.orderType}`"
-        hover-class="none"
+        v-for="product in getProductList(order)"
+        :key="product.id || product.productName"
       >
         <view class="goods flex">
           <view class="thumbnail">
@@ -130,37 +196,41 @@ const orderStateList = [
               :src="product.storePageIcon"
             />
           </view>
-          <view class="flex-1 title pt-2 pb-2">{{ product.productName }}</view>
+          <view class="flex-1 title pt-2 pb-2">{{ safeText(product.productName, '商品信息缺失') }}</view>
           <view class="text-right">
-            <view class="mt-2 font-size-24rpx">{{ product.premium }}</view>
-            <view class="mt-24rpx count color-#A1A1A1">{{ 'x' + product.count }}</view>
+            <view class="mt-2 font-size-24rpx">¥{{ formatMoney(product.premium) }}</view>
+            <view class="mt-24rpx count color-#A1A1A1">{{ 'x' + safeText(product.count, '1') }}</view>
           </view>
         </view>
-      </navigator>
+      </view>
       <view class="payment flex items-baseline justify-end">
-        <view class="quantity color-#A1A1A1">共{{ order.productCount }}件</view>
+        <view class="quantity color-#A1A1A1">共{{ getProductCount(order) }}件</view>
         <text class="ml-2 mr-2 color-#A1A1A1">|</text>
         <view class="amount color-black" v-if="order.orderType === 1 || order.orderType === 2">
-          合计：<text class="symbol">¥</text><text class="font-size-36rpx fw-bold">{{ order.totalPrice }}</text>
+          合计：<text class="symbol">¥</text><text class="font-size-36rpx fw-bold">{{ formatMoney(order.totalPrice) }}</text>
         </view>
         <view class="amount flex color-black" v-if="order.orderType === 3">
           合计：
           <view class="flex items-center">
-            <text class="symbol mr-1">¥</text><text class="font-size-26rpx">{{ order.totalPrice }}</text>
+            <text class="symbol mr-1">¥</text><text class="font-size-26rpx">{{ formatMoney(order.totalPrice) }}</text>
           </view>
           <text class="ml-2 mr-2">+</text>
           <view class="flex items-center">
               <view class="points-icon mr-1"></view>
               <view class="point color-#F2451D font-size-26rpx fw-bold">
-                {{ order.totalPoints + '积分' }}
+                {{ safeText(order.totalPoints, '0') + '积分' }}
               </view>
           </view>
         </view>
       </view>
     </view>
+    <view v-if="showEmpty" class="empty">
+      <view class="empty-title">暂无订单</view>
+      <view class="empty-desc">当前分类还没有订单记录</view>
+    </view>
     <!-- 底部提示文字 -->
-    <view class="loading-text" :style="{ paddingBottom: safeAreaInsets?.bottom + 'px' }">
-      {{ isFinish ? '没有更多数据~' : '正在加载...' }}
+    <view v-if="orderList.length" class="loading-text" :style="{ paddingBottom: safeAreaInsets?.bottom + 'px' }">
+      {{ isFinish ? '没有更多数据~' : (isLoading ? '正在加载...' : '上拉加载更多') }}
     </view>
   </scroll-view>
 </template>
@@ -168,6 +238,8 @@ const orderStateList = [
 <style lang="scss">
 // 订单列表
 .orders {
+  height: 100%;
+
   .card {
     min-height: 100rpx;
     padding: 20rpx;
@@ -207,6 +279,12 @@ const orderStateList = [
       padding-left: 10rpx;
       border-left: 1rpx solid #e3e3e3;
     }
+  }
+
+  .order-time {
+    margin-bottom: 20rpx;
+    font-size: 24rpx;
+    color: #999;
   }
 
   .goods {
@@ -275,6 +353,23 @@ const orderStateList = [
     font-size: 28rpx;
     color: #666;
     padding: 20rpx 0;
+  }
+
+  .empty {
+    padding-top: 260rpx;
+    text-align: center;
+    color: #999;
+  }
+
+  .empty-title {
+    font-size: 34rpx;
+    font-weight: 600;
+    color: #333;
+  }
+
+  .empty-desc {
+    margin-top: 16rpx;
+    font-size: 26rpx;
   }
 }
 

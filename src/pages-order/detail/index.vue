@@ -16,8 +16,8 @@ defineOptions({
 
 import { fetchOrderDetail, getOrderReceipt } from '@/api/order';
 import { commonOrderPay, wxOrderPay } from '@/api/payment';
-import { useUserStore } from '@/store';
-import { formatTime, diffInMilliseconds } from '@/utils/util'
+import { diffInMilliseconds } from '@/utils/util'
+import { computed } from 'vue'
 
 onLoad(async (options) => {
   console.log("onLoad");
@@ -45,13 +45,19 @@ onShow(() => {
   console.log("onShow");
 })
 
-const userStore = useUserStore()
-
 // 定义orderType 
 const orderTypeList = {
   '1': '商品提货',
   '2': '商品购买',
   '3': '商品兑换'
+}
+
+const orderStatusList = {
+  0: '等待付款',
+  1: '待发货',
+  2: '待收货',
+  3: '已完成',
+  4: '已取消',
 }
 
 // 订单号
@@ -83,6 +89,48 @@ const orderInfo = ref({
   detailImg: '',
 })
 
+const defaultAddress = {
+  contactName: '',
+  contactPhone: '',
+  detailAddress: '',
+  province: '',
+  city: '',
+  district: ''
+}
+
+const normalizeOrderInfo = (value: any) => {
+  return {
+    ...orderInfo.value,
+    ...(value || {}),
+    productList: Array.isArray(value?.productList) ? value.productList : [],
+    exchangeList: Array.isArray(value?.exchangeList) ? value.exchangeList : [],
+    address: {
+      ...defaultAddress,
+      ...(value?.address || {}),
+    },
+  }
+}
+
+const safeText = (value: unknown, fallback = '-') => {
+  if (value === null || value === undefined || value === '') {
+    return fallback
+  }
+  return String(value)
+}
+
+const formatMoney = (value: unknown) => safeText(value, '0.00')
+
+const productList = computed(() => Array.isArray(orderInfo.value.productList) ? orderInfo.value.productList : [])
+const exchangeList = computed(() => Array.isArray(orderInfo.value.exchangeList) ? orderInfo.value.exchangeList : [])
+const addressInfo = computed(() => ({ ...defaultAddress, ...(orderInfo.value.address || {}) }))
+const orderStatusText = computed(() => orderStatusList[orderInfo.value.status] || '订单状态未知')
+const orderTypeText = computed(() => orderTypeList[orderInfo.value.orderType] || '未知类型')
+const addressLine = computed(() => {
+  return [addressInfo.value.province, addressInfo.value.city, addressInfo.value.district, addressInfo.value.detailAddress]
+    .filter(Boolean)
+    .join('')
+})
+
 const format = ref<string>('mm分ss秒')
 const time = ref<number>(0)
 
@@ -94,7 +142,7 @@ const fetchOrderDetailHandle = async () => {
       orderNo: orderNo.value
     })
 
-    orderInfo.value = response
+    orderInfo.value = normalizeOrderInfo(response)
 
     // 倒计时
     if (orderInfo.value.status === 0) {
@@ -272,7 +320,7 @@ const paySuccess = (orderNo) => {
         <view v-if="orderInfo.status === 0" class="status-bar flex justify-between items-center h-72rpx bg-#fff pl-30rpx pr-30rpx">
           <view class="flex items-center">
             <wd-icon name="money-circle" size="42rpx" color="#009E07"></wd-icon>
-            <text class="ml-10rpx color-#009E07">等待付款中...</text>
+            <text class="ml-10rpx color-#009E07">{{ orderStatusText }}</text>
           </view>
           <view class="flex">
             <text class="color-#FF5733">关闭倒计时：</text>
@@ -303,7 +351,7 @@ const paySuccess = (orderNo) => {
         <view v-if="orderInfo.status === 3" class="status-bar flex justify-between items-center h-72rpx bg-#fff pl-30rpx pr-30rpx">
           <view class="flex items-center">
             <wd-icon name="money-circle" size="42rpx" color="#009E07"></wd-icon>
-            <text class="ml-10rpx color-#009E07">已签收</text>
+            <text class="ml-10rpx color-#009E07">{{ orderStatusText }}</text>
           </view>
           <view class="flex">
             <wd-icon name="arrow-right" size="36rpx" color="#9C9C9C"></wd-icon>
@@ -313,7 +361,7 @@ const paySuccess = (orderNo) => {
         <view v-if="orderInfo.status === 4" class="status-bar flex justify-between items-center h-72rpx bg-#fff pl-30rpx pr-30rpx">
           <view class="flex items-center">
             <wd-icon name="money-circle" size="42rpx" color="#009E07"></wd-icon>
-            <text class="ml-10rpx color-#009E07">订单已取消</text>
+            <text class="ml-10rpx color-#009E07">{{ orderStatusText }}</text>
           </view>
           <view class="flex">
           </view>
@@ -325,9 +373,9 @@ const paySuccess = (orderNo) => {
         <wd-icon name="location" size="38rpx" color="#FF5733"></wd-icon>
       </view>
       <view class="address font-size-28rpx">
-        <view class="item">{{ orderInfo.address.contactName + orderInfo.address.contactPhone  }}</view>
+        <view class="item">{{ safeText(addressInfo.contactName, '收货人未填写') }} {{ safeText(addressInfo.contactPhone, '手机号未填写') }}</view>
         <view class="item mt-20rpx">
-          {{ orderInfo.address.province + orderInfo.address.city +  orderInfo.address.district + orderInfo.address.detailAddress }}
+          {{ safeText(addressLine, '收货地址未填写') }}
         </view>
       </view>
     </view>
@@ -335,7 +383,7 @@ const paySuccess = (orderNo) => {
     <view
       class="product-list"
     >
-      <view class="goods flex" v-for="product in orderInfo.productList" :key="product.id">
+      <view class="goods flex" v-for="product in productList" :key="product.id || product.productName">
         <view class="thumbnail">
           <wd-img
             width="100%"
@@ -344,20 +392,21 @@ const paySuccess = (orderNo) => {
             :src="product.storePageIcon"
           />
         </view>
-        <view class="flex-1 title pt-2 pb-2">{{ product.productName }}</view>
+        <view class="flex-1 title pt-2 pb-2">{{ safeText(product.productName, '商品信息缺失') }}</view>
         <view class="text-right">
-          <view class="mt-2 font-size-24rpx" v-if="orderInfo.orderType === 1"><text class="symbol">¥</text>{{ product.premium }}</view>
+          <view class="mt-2 font-size-24rpx" v-if="orderInfo.orderType === 1 || orderInfo.orderType === 2"><text class="symbol">¥</text>{{ formatMoney(product.premium) }}</view>
           <view class="mt-2 font-size-24rpx" v-if="orderInfo.orderType === 3">
             <view class="flex items-center">
                 <view class="points-icon mr-1"></view>
                 <view class="point spec-for-point">
-                  {{ product.exchangePrice + '积分' }}
+                  {{ safeText(product.exchangePrice, '0') + '积分' }}
                 </view>
             </view>
           </view>
-          <view class="mt-24rpx count color-#A1A1A1">{{ 'x' + product.count }}</view>
+          <view class="mt-24rpx count color-#A1A1A1">{{ 'x' + safeText(product.count, '1') }}</view>
         </view>
       </view>
+      <view v-if="!productList.length" class="empty-product">暂无商品信息</view>
 
       <view class="flex justify-between color-black">
         <view class="label">
@@ -365,13 +414,13 @@ const paySuccess = (orderNo) => {
         </view>
         <view class="amount color-#FF5733" v-if="orderInfo.orderType === 1 || orderInfo.orderType === 2">
           <text class="symbol">¥</text>
-          <text class="font-size-36rpx fw-bold">{{ orderInfo.totalPrice }}</text>
+          <text class="font-size-36rpx fw-bold">{{ formatMoney(orderInfo.totalPrice) }}</text>
         </view>
         <!-- 兑换商品 运费 + 总积分 -->
         <view class="amount flex items-center" v-if="orderInfo.orderType === 3">
           <view class="points-icon mr-1"></view>
           <view class="point fw-bold color-#FF5733">
-            {{ orderInfo.totalPoints + '积分' }}
+            {{ safeText(orderInfo.totalPoints, '0') + '积分' }}
           </view>
         </view>
       </view> 
@@ -380,19 +429,19 @@ const paySuccess = (orderNo) => {
     <view class="order-intro">
       <view class="item flex justify-between">
         <text class="label">订单编号：</text>
-        <text class="data">{{ orderInfo.orderNo }}</text>
+        <text class="data">{{ safeText(orderInfo.orderNo) }}</text>
       </view>
       <view class="item flex justify-between">
         <text class="label">订单时间：</text>
-        <text class="data">{{ orderInfo.created_at }}</text>
+        <text class="data">{{ safeText(orderInfo.created_at) }}</text>
       </view>
       <view class="item flex justify-between">
         <text class="label">订单类型：</text>
-        <text class="data">{{ orderTypeList[orderInfo.orderType] }}</text>
+        <text class="data">{{ orderTypeText }}</text>
       </view>
       <view class="item flex justify-between">
         <text class="label">运费：</text>
-        <text class="data">{{ orderInfo.shippingFee }}</text>
+        <text class="data">¥{{ formatMoney(orderInfo.shippingFee) }}</text>
       </view>
 
       <view class="mt-20rpx flex justify-between color-black">
@@ -403,24 +452,24 @@ const paySuccess = (orderNo) => {
         <!-- 商品提货 实付 = 运费 -->
         <view class="amount color-#FF5733" v-if="orderInfo.orderType === 1">
           <text class="symbol mr-1">¥</text>
-          <text class="font-size-36rpx fw-bold">{{ orderInfo.shippingFee }}</text>
+          <text class="font-size-36rpx fw-bold">{{ formatMoney(orderInfo.shippingFee) }}</text>
         </view>
 
         <!-- 商品购买 实付 = 运费 + 现金金额 -->
         <view class="amount color-#FF5733" v-if="orderInfo.orderType === 2">
           <text class="symbol mr-1">¥</text>
-          <text class="font-size-36rpx fw-bold">{{ orderInfo.totalPrice }}</text>
+          <text class="font-size-36rpx fw-bold">{{ formatMoney(orderInfo.totalPrice) }}</text>
         </view>
 
         <!-- 兑换商品 实付 = 运费 + 总积分 -->
         <view class="amount flex items-center" v-if="orderInfo.orderType === 3">
           <text class="symbol font-size-24rpx mr-1">¥</text>
-          <text class="font-size-24rpx">{{ orderInfo.totalPrice }}</text>
+          <text class="font-size-24rpx">{{ formatMoney(orderInfo.totalPrice) }}</text>
           <text class="ml-2 mr-2">+</text>
           <view class="flex items-center">
             <view class="points-icon mr-1"></view>
             <view class="point fw-bold color-#FF5733">
-              {{ orderInfo.totalPoints + '积分' }}
+              {{ safeText(orderInfo.totalPoints, '0') + '积分' }}
             </view>
           </view>
         </view>
@@ -435,7 +484,7 @@ const paySuccess = (orderNo) => {
           <view class="flex items-center">
             <view class="points-icon mr-1"></view>
             <view class=" color-#000000">
-              {{ orderInfo.exchangeTotalPoints }}
+            {{ safeText(orderInfo.exchangeTotalPoints, '0') }}
             </view>
           </view>
         </view>
@@ -445,8 +494,8 @@ const paySuccess = (orderNo) => {
         </view>
         <view class="mt-20rpx">
           <scroll-view class="scroll-container" scroll-x>
-            <view class="lists" v-if="orderInfo.exchangeList.length">
-              <view class="goods-item flex items-center" v-for="item in orderInfo.exchangeList" :key="item.id">
+            <view class="lists" v-if="exchangeList.length">
+              <view class="goods-item flex items-center" v-for="item in exchangeList" :key="item.id || item.productName">
                   <view class="thumbnail">
                     <wd-img
                       width="100%"
@@ -454,11 +503,11 @@ const paySuccess = (orderNo) => {
                       :src="item.storePageIcon"
                     />
                   </view>
-                  <view class="title">{{ item.productName }}</view>
+                  <view class="title">{{ safeText(item.productName, '商品') }}</view>
                   <view class="mt-2 flex items-center">
                     <view class="points-icon mr-1"></view>
                     <view class="font-size-20rpx color-#000000">
-                      {{ item.dismantlePrice }}
+                      {{ safeText(item.dismantlePrice, '0') }}
                     </view>
                   </view>
               </view>
@@ -530,6 +579,13 @@ const paySuccess = (orderNo) => {
   margin-top: 6px;
   padding: 30rpx;
   background: #fff;
+}
+
+.empty-product {
+  padding: 40rpx 0;
+  text-align: center;
+  font-size: 26rpx;
+  color: #999;
 }
 
 .goods {

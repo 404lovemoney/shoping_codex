@@ -15,7 +15,6 @@ defineOptions({
 })
 
 import OrderList from './components/OrderList.vue'
-import { useUserStore } from '@/store';
 
 onLoad(async (options) => {
   console.log("onLoad");
@@ -30,7 +29,9 @@ onLoad(async (options) => {
   } else {
     type.value = -1
   }
-  activeIndex.value = orderTabs.value.findIndex((v) => v.orderState === Number(type.value))
+  const nextIndex = orderTabs.value.findIndex((v) => v.orderState === Number(type.value))
+  activeIndex.value = nextIndex >= 0 ? nextIndex : 0
+  orderTabs.value[activeIndex.value].isRender = true
 })
 
 onMounted(async () => {
@@ -63,6 +64,15 @@ const goBackHandle = (() => {
   uni.navigateBack()
 })
 
+const switchTab = (index: number) => {
+  activeIndex.value = index
+  orderTabs.value[index].isRender = true
+}
+
+const handleSwiperChange = (event) => {
+  switchTab(event.detail.current)
+}
+
 </script>
 
 <template>
@@ -80,12 +90,8 @@ const goBackHandle = (() => {
         class="item"
         v-for="(item, index) in orderTabs"
         :key="item.title"
-        @click="
-          () => {
-            activeIndex = index
-            item.isRender = true
-          }
-        "
+        :class="{ active: activeIndex === index }"
+        @click="switchTab(index)"
       >
         {{ item.title }}
       </text>
@@ -93,7 +99,7 @@ const goBackHandle = (() => {
       <view class="cursor" :style="{ left: activeIndex * 20 + '%' }"></view>
     </view>
     <!-- 滑动容器 -->
-    <swiper class="swiper" :current="activeIndex" @change="activeIndex = $event.detail.current">
+    <swiper class="swiper" :current="activeIndex" @change="handleSwiperChange">
       <!-- 滑动项 -->
       <swiper-item v-for="item in orderTabs" :key="item.title">
         <!-- 订单列表 -->
@@ -133,6 +139,11 @@ const goBackHandle = (() => {
     color: #262626;
   }
 
+  .active {
+    color: #27BAAD;
+    font-weight: 600;
+  }
+
   .cursor {
     position: absolute;
     box-sizing: border-box;
@@ -150,6 +161,7 @@ const goBackHandle = (() => {
 
 // swiper
 .swiper {
+  flex: 1;
   background-color: #f7f7f8;
 }
 </style>
