@@ -11,37 +11,121 @@
 </route>
 
 <script lang="ts" setup>
-import { useToast } from 'wot-design-uni'
-import { fetchUserCenter } from '@/service/usercenter/fetchUsercenter'
 // import { saveUserInfoState, isLoggedIn, getUserProfile } from '@/api/auth'
 import orderGroup from './components/order-group/index.vue'
-
-import userCenterHeader from './components/user-center-header/index.vue'
 
 // pinia
 import { useUserStore } from '@/store'
 const userStore = useUserStore()
 
-const { show: showToast } = useToast()
-
 // const UserInfo = ref<UserInfo>
-  const defaultAvatarUrl = ref<string>('https://img.niantu.cn/spark-mall/static/images/default-avatar.png')
+const defaultAvatarUrl = 'https://img.niantu.cn/spark-mall/static/images/default-avatar.png'
+
+const safeText = (value: unknown, fallback = '--') => {
+  if (value === null || value === undefined || value === '') {
+    return fallback
+  }
+  return String(value)
+}
+
+const safeNumber = (value: unknown, fallback = 0) => {
+  const num = Number(value)
+  return Number.isFinite(num) ? num : fallback
+}
+
+const formatAmount = (value: unknown) => {
+  return safeNumber(value).toFixed(2)
+}
+
+const maskPhone = (phone: unknown) => {
+  const phoneText = String(phone || '')
+  if (phoneText.length < 7) {
+    return phoneText || '未绑定手机号'
+  }
+  return `${phoneText.slice(0, 3)}****${phoneText.slice(-4)}`
+}
+
+const isLoggedIn = computed(() => userStore.isLoggedIn())
+
+const displayUserInfo = computed(() => {
+  const userInfo = userStore.userInfo || {}
+  const nickName = safeText(userInfo.nickName || userInfo.username, isLoggedIn.value ? '火花用户' : '未登录')
+  const phone = maskPhone(userInfo.phone)
+
+  return {
+    avatar: userInfo.avatar || defaultAvatarUrl,
+    nickName,
+    phone,
+    id: safeText(userInfo.id && userInfo.id !== '0' ? userInfo.id : '', '--'),
+    balance: formatAmount(userInfo.balance),
+    points: safeNumber(userInfo.points),
+    giftCard: 0,
+    coupon: 0,
+    isAgent: Number(userInfo.isAgent || 0) === 1,
+    totalCommission: formatAmount(userInfo.totalCommission),
+    totalInvitCount: safeNumber(userInfo.totalInvitCount),
+    withdrawalAmount: formatAmount(userInfo.withdrawalAmount),
+    processAmount: formatAmount(userInfo.processAmount),
+  }
+})
 
 const menuData = [
   [
     {
       title: '地址管理',
-      tit: '',
-      url: '',
+      tit: '管理收货地址',
+      url: '/pages-user/address/list',
       type: 'address',
       icon: "location"
     },
     {
-      title: '在线客服',
-      tit: '',
-      url: '',
-      type: 'service',
-      icon: 'service',
+      title: '我的订单',
+      tit: '查看订单记录',
+      url: '/pages-order/list/index?type=-1',
+      type: 'order',
+      icon: 'wallet',
+    },
+    {
+      title: '消息中心',
+      tit: '站内通知',
+      url: '/pages-user/message/list/index',
+      type: 'message',
+      icon: 'dong',
+    },
+    {
+      title: '余额记录',
+      tit: '余额明细与提现',
+      url: '/pages-user/balance/index/index',
+      type: 'balance',
+      icon: 'money-circle',
+    },
+    {
+      title: '积分记录',
+      tit: '查看积分明细',
+      url: '/pages/points/index/index',
+      type: 'points',
+      icon: 'star',
+    },
+    {
+      title: '提现申请',
+      tit: '提交提现',
+      url: '/pages-user/balance/apply-withdrawal/index',
+      type: 'withdrawal',
+      icon: 'creditcard',
+    },
+    {
+      title: '佣金中心',
+      tit: '邀请与佣金',
+      url: '/pages-user/agency/index/index',
+      type: 'agency',
+      icon: 'usergroup',
+    },
+    {
+      title: '资料设置',
+      tit: '头像昵称',
+      url: '/pages-user/profile/index',
+      type: 'profile',
+      icon: 'setting1',
     },
   ],
 ]
@@ -81,7 +165,6 @@ const orderTagInfos = [
 
 const state = reactive<any>({
   showMakePhone: false,
-  userInfo: userStore.userInfo,
   menuData,
   orderTagInfos,
   customerServiceInfo: {},
@@ -111,7 +194,6 @@ function init() {
   if (userStore.isLoggedIn()) {
     console.log('已登录')
     fetchUserInfoHandle()
-    // fetchUserAddressHandle()
   } else {
     console.log('未登录')
   }
@@ -133,15 +215,13 @@ const fetchUserInfoHandle = async () => {
     // saveUserInfoState(response)
     // userStore.setUserInfo(response)
 
-    state.userInfo = response
-
-    console.log('state.userInfo', state.userInfo.phone);
+    console.log('userInfo phone', response.phone);
 
     state.currAuthStep = 2
 
   } catch (error: any) {
     uni.showToast({
-      title: error.message || '登录失败，请重试',
+      title: error.message || '用户信息加载失败',
       icon: 'none',
       duration: 2000
     })
@@ -149,83 +229,62 @@ const fetchUserInfoHandle = async () => {
   }
 }
 
-// 获取用户地址
-const fetchUserAddressHandle = async () => {
-  try {
-    // 调用获取用户地址列表API
-    const response = await userStore.getUserAddressList()
-    console.log('response', response)
-  } catch (error: any) {
-    uni.showToast({
-      title: error.message || '登录失败，请重试',
-      icon: 'none',
-      duration: 2000
-    })
-  } finally {
+const requireLogin = (redirectUrl = '/pages/usercenter/index') => {
+  if (userStore.isLoggedIn()) {
+    return true
   }
+
+  uni.showToast({
+    title: '请登录后操作',
+    icon: 'none'
+  })
+  uni.navigateTo({
+    url: `/pages/login/login?redirect=${encodeURIComponent(redirectUrl)}`
+  })
+  return false
+}
+
+function navigateByUrl(url: string) {
+  const path = url.split('?')[0]
+  if (['/pages/home/home', '/pages/box/index/index', '/pages/points/index/index', '/pages/usercenter/index'].includes(path)) {
+    uni.switchTab({ url })
+    return
+  }
+  uni.navigateTo({ url })
 }
 
 function onClickCell(item) {
   console.log('onClickCell', item)
-  switch (item.type) {
-    case 'address': {
-      showToast({
-        msg: '你点击了地址菜单',
-      })
-      uni.navigateTo({ url: '/pages-user/address/list' })
-      break
-    }
-    case 'service': {
-      showToast({
-        msg: '你点击了帮助中心',
-      })
-      // openMakePhone()
-      break
-    }
-    case 'help-center': {
-      showToast({
-        msg: '你点击了帮助中心',
-      })
-      break
-    }
-    case 'point': {
-      showToast({
-        msg: '你点击了积分菜单',
-      })
-      break
-    }
-    case 'coupon': {
-      showToast({
-        msg: '你点击了优惠券菜单',
-      })
-      // wx.navigateTo({ url: '/pages/coupon/coupon-list/index' })
-      break
-    }
-    default: {
-      showToast({
-        msg: '未知跳转',
-      })
-      break
-    }
+  if (!item.url) {
+    uni.showToast({
+      title: '功能建设中',
+      icon: 'none'
+    })
+    return
   }
+  if (!requireLogin(item.url)) return
+  navigateByUrl(item.url)
 }
 
 function jumpOrderNav(status) {
-  uni.navigateTo({ url: `/pages-order/list/index?type=${status}` })
+  const url = `/pages-order/list/index?type=${status}`
+  if (!requireLogin(url)) return
+  uni.navigateTo({ url })
 }
 
 const jumpPageHandle = (pageName) => {
   console.log('pageName:', pageName)
-  if (userStore.isLoggedIn()) {
-    switch (pageName) {
-      case 'balance':
-        uni.navigateTo({
-          url: '/pages-user/balance/index/index',
-          success(res) {
-          }
-        })
+  switch (pageName) {
+    case 'balance':
+      if (!requireLogin('/pages-user/balance/index/index')) return
+      uni.navigateTo({
+        url: '/pages-user/balance/index/index',
+        success(res) {
+        }
+      })
       break
     case 'points':
+      if (!requireLogin('/pages/points/index/index')) return
       // switchTab 必须写完整路径
       uni.switchTab({
         url: '/pages/points/index/index',
@@ -234,13 +293,6 @@ const jumpPageHandle = (pageName) => {
       })
       break
     default:
-    }
-  } else {
-    uni.showToast({
-      title: '请登录后操作',
-      icon: 'none'
-    })
-    return
   }
 }
 
@@ -253,6 +305,7 @@ function call() {
 // 退出登录
 const logoutHandle = async ()=> {
   await userStore.logout()
+  state.currAuthStep = 1
   uni.reLaunch({
     url: '/pages/usercenter/index'
   });
@@ -260,7 +313,7 @@ const logoutHandle = async ()=> {
 
 // 跳转登录页面
 const gotoUserEditPage = () => {
-  uni.navigateTo({ url: '/pages/login/login' })
+  uni.navigateTo({ url: '/pages/login/login?redirect=/pages/usercenter/index' })
 }
 
 // 跳转商城首页
@@ -275,6 +328,7 @@ const goHomePage = () => {
 
 // 跳转代理
 const goAgencyPage = () => {
+  if (!requireLogin('/pages-user/agency/index/index')) return
   uni.navigateTo({ url: '/pages-user/agency/index/index'})
 }
 
@@ -285,7 +339,13 @@ const goConsignmentPage = () => {
 
 // 跳转站内信
 const goMessageHandle = () => {
+  if (!requireLogin('/pages-user/message/list/index')) return
   uni.navigateTo({ url: '/pages-user/message/list/index'})
+}
+
+const goProfilePage = () => {
+  if (!requireLogin('/pages-user/profile/index')) return
+  uni.navigateTo({ url: '/pages-user/profile/index' })
 }
 </script>
 
@@ -302,46 +362,50 @@ const goMessageHandle = () => {
     </custom-nav-bar>
     <view class="header flex justify-between">
       <view class="flex items-center">
-        <wd-img width="140rpx" height="140rpx" round :src="userStore.userInfo.avatar || defaultAvatarUrl" />
+        <wd-img width="140rpx" height="140rpx" round :src="displayUserInfo.avatar" />
         <view class="user-intro">
-          <template v-if="userStore.isLoggedIn()">
+          <template v-if="isLoggedIn">
             <navigator
               url="/pages-user/profile/index" 
               open-type="navigate"
               hover-class="navigator-hover"
             >
               <view class="header__name">
-                {{ userStore.userInfo.phone }}
+                {{ displayUserInfo.nickName }}
               </view>
-              <view class="mt-2 header__name">
-                ID：{{ userStore.userInfo.id }}
+              <view class="mt-2 header__meta">
+                {{ displayUserInfo.phone }}
+              </view>
+              <view class="mt-2 header__meta">
+                ID：{{ displayUserInfo.id }}
               </view>
             </navigator>
           </template>
           <template v-else>
             <view class="login-tip" @click="gotoUserEditPage">
-              请授权登录
+              请登录 / 注册
+              <view class="login-subtip">登录后查看资产、订单和消息</view>
             </view>
           </template>
         </view>
       </view>
       <view class="quick-operation flex justify-between">
         <wd-icon name="dong" size="44rpx" color="#fff" @click="goMessageHandle"></wd-icon>
-        <wd-icon name="setting1" size="44rpx" color="#fff"></wd-icon>
+        <wd-icon name="setting1" size="44rpx" color="#fff" @click="goProfilePage"></wd-icon>
       </view>
     </view>
 
     <!-- 只有代理才显示 -->
-    <view class="agency-region" v-if="userStore.userInfo.isAgent" @click="goAgencyPage">
+    <view class="agency-region" v-if="displayUserInfo.isAgent" @click="goAgencyPage">
       <view class="flex ">
         <view class="flex agency-list">
           <view class="agency-item">
           <view class="label">获得佣金</view>
-          <view class="num">{{ userStore.userInfo.totalCommission }}</view>
+          <view class="num">{{ displayUserInfo.totalCommission }}</view>
         </view>
         <view class="agency-item">
           <view class="label">已邀请</view>
-          <view class="num">{{ userStore.userInfo.totalInvitCount }}</view>
+          <view class="num">{{ displayUserInfo.totalInvitCount }}</view>
         </view>
         </view>
         <image
@@ -355,19 +419,19 @@ const goMessageHandle = () => {
     <view class="relative p-x-4 mb-1">  
       <view class="account-data h-156rpx bg-white rounded-2 grid grid-cols-4">
         <view class="data-item" @click="jumpPageHandle('points')">
-          <view class="text-center">{{ userStore.userInfo.points }}</view>
+          <view class="text-center">{{ displayUserInfo.points }}</view>
           <view class="text-center label">积分</view>
         </view>
         <view class="data-item" @click="jumpPageHandle('balance')">
-          <view class="text-center">{{ userStore.userInfo.balance }}</view>
+          <view class="text-center">{{ displayUserInfo.balance }}</view>
           <view class="text-center label">余额</view>
         </view>
         <view class="data-item">
-          <view class="text-center">{{ 0 }}</view>
+          <view class="text-center">{{ displayUserInfo.giftCard }}</view>
           <view class="text-center label">礼品卡</view>
         </view>
         <view class="data-item">
-          <view class="text-center">{{ 0 }}</view>
+          <view class="text-center">{{ displayUserInfo.coupon }}</view>
           <view class="text-center label">优惠券</view>
         </view>
       </view>
@@ -376,6 +440,12 @@ const goMessageHandle = () => {
     <view class="relative p-x-4">
       <view class="mb-2">
         <order-group :order-tag-infos="state.orderTagInfos" @on-click-item="jumpOrderNav" />
+      </view>
+
+      <view v-if="!isLoggedIn" class="login-guide mb-2 bg-white rounded-2">
+        <view class="guide-title">登录后开启完整个人中心</view>
+        <view class="guide-desc">同步展示余额、积分、订单、地址、消息与佣金信息。</view>
+        <view class="guide-btn" @click="gotoUserEditPage">立即登录</view>
       </view>
 
       <!-- 引导区 -->
@@ -405,7 +475,7 @@ const goMessageHandle = () => {
 
     <footer-tool-bar>
       <view class="flex justify-center items-center h-100rpx">
-        <view class="user-logout text-align-center" v-if="userStore.isLoggedIn()">
+        <view class="user-logout text-align-center" v-if="isLoggedIn">
           <wd-button @click="logoutHandle">退出登录</wd-button>
         </view>
       </view>
@@ -431,12 +501,37 @@ const goMessageHandle = () => {
   font-size: 30rpx;
   font-weight: bold;
 }
+.header__name{
+  max-width: 420rpx;
+  font-size: 34rpx;
+  line-height: 42rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.header__meta{
+  max-width: 420rpx;
+  font-size: 24rpx;
+  line-height: 30rpx;
+  font-weight: normal;
+  color: rgba(255, 255, 255, 0.86);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .login-tip{
   box-sizing: border-box;
-  padding-top: 30rpx;
+  padding-top: 20rpx;
   height: 140rpx;
-  font-size: 48rpx;
+  font-size: 42rpx;
   font-weight: bold;
+}
+.login-subtip{
+  margin-top: 14rpx;
+  font-size: 24rpx;
+  line-height: 32rpx;
+  font-weight: normal;
+  color: rgba(255, 255, 255, 0.84);
 }
 .quick-operation{
   width: 100rpx;
@@ -494,5 +589,32 @@ const goMessageHandle = () => {
   width: 340rpx;
   height: 178rpx;
   background: #000;
+}
+.login-guide{
+  box-sizing: border-box;
+  padding: 28rpx 32rpx;
+}
+.guide-title{
+  font-size: 30rpx;
+  font-weight: bold;
+  color: #262626;
+}
+.guide-desc{
+  margin-top: 12rpx;
+  font-size: 24rpx;
+  line-height: 34rpx;
+  color: #808080;
+}
+.guide-btn{
+  margin-top: 22rpx;
+  width: 168rpx;
+  height: 56rpx;
+  line-height: 56rpx;
+  text-align: center;
+  border-radius: 28rpx;
+  background: #24BFD6;
+  color: #fff;
+  font-size: 26rpx;
+  font-weight: bold;
 }
 </style>

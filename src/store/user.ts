@@ -92,20 +92,27 @@ export const useUserStore = defineStore(
     }
 
     // 设置用户信息
+    const normalizeUserInfo = (val?: Partial<IUserInfo> | null): IUserInfo => {
+      const nextUserInfo = val || {}
+      return {
+        ...userInfoState,
+        ...nextUserInfo,
+        id: String(nextUserInfo.id || userInfoState.id),
+        username: nextUserInfo.username || nextUserInfo.nickName || '',
+        phone: nextUserInfo.phone || '',
+        balance: Number(nextUserInfo.balance || 0),
+        points: Number(nextUserInfo.points || 0),
+        sex: nextUserInfo.sex || '',
+        avatar: nextUserInfo.avatar || 'https://img.niantu.cn/spark-mall/static/images/default-avatar.png',
+        token: nextUserInfo.token || getToken(),
+      }
+    }
+
     const setUserInfo = (val: IUserInfo) => {
       console.log('设置用户信息------', val)
-      // 若头像为空 则使用默认头像
-      if (val.avatar) {
-        val.avatar = val.avatar
-      }
-      else {
-        val.avatar = 'https://img.niantu.cn/spark-mall/static/images/default-avatar.png'
-      }
-      const token = val.token || getToken()
-      userInfo.value = {
-        ...val,
-        token,
-      }
+      const normalizedUserInfo = normalizeUserInfo(val)
+      const token = normalizedUserInfo.token
+      userInfo.value = normalizedUserInfo
       if (token) {
         uni.setStorageSync('token', token)
       }
@@ -155,6 +162,7 @@ export const useUserStore = defineStore(
       uni.removeStorageSync('token')
       uni.removeStorageSync('userInfo')
       uni.removeStorageSync('openId')
+      uni.removeStorageSync('user')
     }
 
     // 清除地址信息
@@ -168,12 +176,14 @@ export const useUserStore = defineStore(
     const getUserInfo = async () => {
       const res = await _getUserInfo()
       console.log('pinia getUserInfo', res)
-      let userInfo = res
-      userInfo.token = uni.getStorageSync('token')
-      setUserInfo(userInfo)
+      const nextUserInfo = normalizeUserInfo({
+        ...res,
+        token: uni.getStorageSync('token') || res?.token,
+      })
+      setUserInfo(nextUserInfo)
       // uni.setStorageSync('userInfo', userInfo)
       // TODO 这里可以增加获取用户路由的方法 根据用户的角色动态生成路由
-      return res
+      return nextUserInfo
     }
 
     /**
