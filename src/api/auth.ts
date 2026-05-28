@@ -1,6 +1,7 @@
 // import { get, post } from '@/utils/request'
 import { API_DOMAINS, http } from '@/http/request/alova'
 import type { addressItem } from '@/api/types/address'
+import type { IUserInfo } from '@/api/types/login'
 // 认证相关接口类型
 export interface LoginParams {
   phone: number  // 手机号
@@ -52,6 +53,7 @@ export interface getWithdrawalListResponse {
 
 export interface LoginResponse {
   token: string
+  userInfo?: IUserInfo | null
 }
 
 // 用户登录

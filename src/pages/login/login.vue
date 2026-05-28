@@ -31,6 +31,35 @@ const phoneFocused = ref(false)
 const passwordFocused = ref(false)
 const isLoading = ref(false)
 const redirectUrl = ref('')
+const tabbarPages = ['/pages/home/home', '/pages/box/index/index', '/pages/points/index/index', '/pages/usercenter/index']
+
+const normalizeRedirectUrl = (url = '') => {
+  if (!url || url.split('?')[0] === '/pages/login/login') {
+    return '/pages/usercenter/index'
+  }
+  return url
+}
+
+const getTargetUrl = () => {
+  return normalizeRedirectUrl(redirectUrl.value || uni.getStorageSync('pageUrl') || '/pages/usercenter/index')
+}
+
+const jumpToTarget = (url: string) => {
+  const targetUrl = normalizeRedirectUrl(url)
+  const targetPath = targetUrl.split('?')[0]
+
+  if (tabbarPages.includes(targetPath)) {
+    uni.reLaunch({ url: targetUrl })
+    return
+  }
+
+  uni.redirectTo({ url: targetUrl })
+}
+
+const clearRedirect = () => {
+  uni.removeStorageSync('pageUrl')
+  redirectUrl.value = ''
+}
 
 onLoad((options) => {
   if (typeof options?.redirect === 'string') {
@@ -132,9 +161,9 @@ const checkSession = () => {
 // 页面加载时检查登录状态
 onMounted(() => {
   if (userStore.isLoggedIn()) {
-    uni.switchTab({
-      url: '/pages/usercenter/index'
-    })
+    const pageUrl = getTargetUrl()
+    clearRedirect()
+    jumpToTarget(pageUrl)
   }
 })
 
@@ -158,9 +187,25 @@ const handleBlur = (field: 'phone' | 'password') => {
 
 // 登录处理
 const handleLogin = async () => {
-  if (!formData.phone || !formData.password) {
+  if (isLoading.value) {
+    return
+  }
+
+  const phone = String(formData.phone).trim()
+  const password = formData.password.trim()
+
+  if (!phone) {
     uni.showToast({
-      title: '请填写完整的登录信息',
+      title: '请输入手机号',
+      icon: 'none',
+      duration: 2000
+    })
+    return
+  }
+
+  if (!password) {
+    uni.showToast({
+      title: '请输入密码',
       icon: 'none',
       duration: 2000
     })
@@ -173,8 +218,8 @@ const handleLogin = async () => {
 
     // 使用 pinia 调用登录
     const response = await userStore.login({
-      phone: parseInt(formData.phone),
-      password: formData.password,
+      phone: Number(phone),
+      password,
       code: null,
       type: 2
     })
@@ -196,70 +241,24 @@ const handleLogin = async () => {
   }
 }
 
-// 获取用户地址
-const fetchUserAddressHandle = async () => {
-  try {
-    // 调用获取用户地址列表API
-    const response = await userStore.getUserAddressList()
-
-    console.log('response', response)
-
-  } catch (error: any) {
-    uni.showToast({
-      title: error.message || '登录失败，请重试',
-      icon: 'none',
-      duration: 2000
-    })
-  } finally {
-  }
-}
-
 // 登录成功后续操作
 const loginSuccess = (response) => {
   if (!response?.token) {
     return
   }
 
-  // 保存登录状态
-  userStore.setUserToken(response)
-
-  // 获取用户地址信息
-  fetchUserAddressHandle()
-
   // 登录成功提示
   uni.showToast({
     title: '登录成功',
     icon: 'success',
-    duration: 2000
+    duration: 1200
   })
 
-  // 登录成功处理相应跳转
-  let pageUrl = redirectUrl.value || uni.getStorageSync('pageUrl')
-  if (pageUrl) {
-    // 如果为tabbar页面则用reLaunch跳转
-    if (['/pages/home/home', '/pages/box/index/index', '/pages/points/index/index', '/pages/usercenter/index'].includes(pageUrl.split('?')[0])) {
-      uni.reLaunch({url: pageUrl})
-    } else {
-      uni.redirectTo({url: pageUrl})
-    }
-    //跳转后，删除url记录避免重复跳转
-    uni.removeStorageSync('pageUrl')
-    redirectUrl.value = ''
-  } else {
-    // 如果没有默认跳转到首页
-    // 跳转到用户中心
-    setTimeout(() => {
-      uni.switchTab({
-        url: '/pages/usercenter/index',
-        success(res) {
-          console.log('跳转成功')
-          let page = getCurrentPages().pop();
-          if (page == undefined || page == null) return;
-          page.onShow();
-        }
-      })
-    }, 2000)
-  }
+  const pageUrl = getTargetUrl()
+  clearRedirect()
+  setTimeout(() => {
+    jumpToTarget(pageUrl)
+  }, 300)
 }
 
 // 忘记密码处理

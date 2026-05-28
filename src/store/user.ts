@@ -56,8 +56,15 @@ export const useUserStore = defineStore(
     // 定义地址信息
     const userAddress = ref<IUserAddress>({ ...userAddressState })
 
+    const getStorageUserInfo = (): IUserInfo | null => {
+      const storageUserInfo = uni.getStorageSync('userInfo')
+      return storageUserInfo && typeof storageUserInfo === 'object'
+        ? storageUserInfo as IUserInfo
+        : null
+    }
+
     const getToken = () => {
-      return uni.getStorageSync('token') || userInfo.value.token || ''
+      return uni.getStorageSync('token') || getStorageUserInfo()?.token || userInfo.value.token || ''
     }
 
     // 设置用户token
@@ -68,6 +75,13 @@ export const useUserStore = defineStore(
       }
       uni.setStorageSync('token', val.token)
       userInfo.value.token = val.token
+      const storageUserInfo = getStorageUserInfo()
+      if (storageUserInfo) {
+        uni.setStorageSync('userInfo', {
+          ...storageUserInfo,
+          token: val.token,
+        })
+      }
     }
 
     // 设置用户OpenId
@@ -190,14 +204,22 @@ export const useUserStore = defineStore(
     const login = async (LoginParams: {
       phone: number
       password: string
-      code: number
+      code?: number | null
       type: number
     }) => {
       const res = await _login(LoginParams)
       console.log('登录信息', res)
       toast.success('登录成功')
       setUserToken(res)
-      await getUserInfo() // 获取用户信息
+      if (res.userInfo) {
+        setUserInfo({
+          ...res.userInfo,
+          token: res.token,
+        })
+      }
+      else {
+        await getUserInfo() // 获取用户信息
+      }
       return res
     }
     /**
