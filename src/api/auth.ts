@@ -62,8 +62,8 @@ export const login = async (params: LoginParams): Promise<LoginResponse> => {
 }
 
 // 用户注册
-export const register = async (params: RegisterParams): Promise<void> => {
-  return http.Post<void>('/user/register', params)
+export const register = async (params: RegisterParams): Promise<LoginResponse> => {
+  return http.Post<LoginResponse>('/user/register', params)
 }
 
 // 获取用户信息

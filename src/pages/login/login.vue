@@ -49,7 +49,7 @@ const jumpToTarget = (url: string) => {
   const targetPath = targetUrl.split('?')[0]
 
   if (tabbarPages.includes(targetPath)) {
-    uni.reLaunch({ url: targetUrl })
+    uni.switchTab({ url: targetPath })
     return
   }
 

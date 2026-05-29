@@ -1,10 +1,13 @@
-insert into users (id, phone, username, avatar, balance, points, sex, is_agent, open_id, token)
+insert into public.users (id, phone, password, username, nickname, avatar, balance, points, sex, is_agent, open_id, token)
 values
-  (10001, '13800000000', '火花用户', 'https://img.niantu.cn/spark-mall/static/images/default-avatar.png', 268.80, 3600, '未知', 1, 'mock-open-id', 'mock-token-001'),
-  (90001, '13800123456', 'admin', 'https://img.niantu.cn/spark-mall/static/images/default-avatar.png', 1288.66, 9680, '未知', 1, 'mock-admin-open-id', 'mock-token-admin')
+  (10001, '13800000000', '123456', 'test_user', '火花用户', 'https://img.niantu.cn/spark-mall/static/images/default-avatar.png', 268.80, 3600, '未知', 1, 'mock-open-id', 'mock-token-001'),
+  (90001, '13800123456', '123456', 'admin', '管理员', 'https://img.niantu.cn/spark-mall/static/images/default-avatar.png', 1288.66, 9680, '未知', 1, 'mock-admin-open-id', 'mock-token-admin'),
+  (90002, '13800123457', '123456', 'invitee_b', '好友B', 'https://img.niantu.cn/spark-mall/static/images/default-avatar.png', 0, 0, '未知', 0, null, null)
 on conflict (id) do update set
   phone = excluded.phone,
+  password = excluded.password,
   username = excluded.username,
+  nickname = excluded.nickname,
   avatar = excluded.avatar,
   balance = excluded.balance,
   points = excluded.points,

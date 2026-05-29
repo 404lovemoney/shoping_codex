@@ -58,7 +58,7 @@ const alovaInstance = createAlova({
     console.log('method', method.config);
     // 设置默认 Content-Type
     method.config.headers = {
-      ContentType: ContentTypeEnum.JSON,
+      'Content-Type': ContentTypeEnum.JSON,
       Accept: 'application/json, text/plain, */*',
       'x-token': getToken(),
       ...method.config.headers,
@@ -106,7 +106,7 @@ const alovaInstance = createAlova({
 
     // 处理 HTTP 状态码错误
     if (statusCode !== 200) {
-      const errorMessage = ShowMessage(statusCode) || `HTTP请求错误[${statusCode}]`
+      const errorMessage = (rawData as IResponse | undefined)?.message || ShowMessage(statusCode) || `HTTP请求错误[${statusCode}]`
       console.error('errorMessage===>', errorMessage)
       toast.error(errorMessage)
       throw new Error(`${errorMessage}：${errMsg}`)
@@ -114,7 +114,7 @@ const alovaInstance = createAlova({
 
     // 处理业务逻辑错误
     const { code, message, data } = rawData as IResponse
-    if (code !== ResultEnum.Success) {
+    if (code !== ResultEnum.Success && code !== 200) {
       if (config.meta?.toast !== false) {
         toast.warning(message)
       }

@@ -210,7 +210,7 @@ const handleRegister = async () => {
     // })
     
     // 调用pinia 注册API
-    userStore.register({
+    await userStore.register({
       phone: parseInt(formData.phone),
       password: formData.password,
       code: Math.random().toString(36).slice(-12)

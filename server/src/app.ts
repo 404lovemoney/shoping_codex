@@ -106,6 +106,10 @@ function normalizePassword(value: unknown) {
   return String(value || '')
 }
 
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error || 'server error')
+}
+
 async function hashPassword(password: string) {
   const salt = randomBytes(16).toString('hex')
   const derivedKey = await scrypt(password, salt, 64) as Buffer
@@ -415,7 +419,7 @@ app.post('/user/login', async (req, res) => {
   }
   catch (error) {
     console.error(error)
-    failure(res)
+    failure(res, getErrorMessage(error))
   }
 })
 
@@ -462,7 +466,7 @@ app.get('/user/info', async (req, res) => {
   }
   catch (error) {
     console.error(error)
-    failure(res)
+    failure(res, getErrorMessage(error))
   }
 })
 
@@ -535,7 +539,7 @@ app.post('/user/register', async (req, res) => {
   }
   catch (error) {
     console.error(error)
-    failure(res)
+    failure(res, getErrorMessage(error))
   }
 })
 
